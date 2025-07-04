@@ -1,0 +1,13 @@
+{
+  "short_name": "Field Medical Training",
+  "name": "Field Medical Training Platform",
+  "description": "AI-powered training platform for Field Medical professionals to practice with Healthcare Professional avatars",
+  "icons": [],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0ea5e9",
+  "background_color": "#f8fafc",
+  "categories": ["medical", "education", "training"],
+  "lang": "en-US",
+  "orientation": "any"
+} 
