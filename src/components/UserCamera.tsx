@@ -30,8 +30,34 @@ const UserCamera: React.FC<UserCameraProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
 
+  // Ensure video plays when stream is available
+  useEffect(() => {
+    if (stream && videoRef.current && isActive) {
+      const video = videoRef.current;
+      video.srcObject = stream;
+      
+      const playVideo = async () => {
+        try {
+          await video.play();
+          console.log('Video started playing successfully');
+        } catch (error) {
+          console.error('Video play error:', error);
+        }
+      };
+      
+      // Play video when metadata is loaded
+      video.addEventListener('loadedmetadata', playVideo);
+      
+      return () => {
+        video.removeEventListener('loadedmetadata', playVideo);
+      };
+    }
+  }, [stream, isActive]);
+
   const startCamera = async () => {
     setIsLoading(true);
+    console.log('Starting camera...');
+    
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
         video: {
@@ -42,11 +68,19 @@ const UserCamera: React.FC<UserCameraProps> = ({
         audio: true
       });
 
+      console.log('Camera stream obtained:', mediaStream);
+      console.log('Video tracks:', mediaStream.getVideoTracks());
+      
       setStream(mediaStream);
       setHasPermission(true);
       
       if (videoRef.current) {
+        console.log('Setting video source...');
         videoRef.current.srcObject = mediaStream;
+        // Ensure video plays
+        videoRef.current.play().catch((error) => {
+          console.error('Video play failed:', error);
+        });
       }
 
       if (onCameraReady) {
@@ -123,7 +157,16 @@ const UserCamera: React.FC<UserCameraProps> = ({
         autoPlay
         muted
         playsInline
-        className="w-full h-full object-cover"
+        controls={false}
+        style={{
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          backgroundColor: '#000'
+        }}
+        onLoadedMetadata={() => console.log('Video metadata loaded')}
+        onPlay={() => console.log('Video playing')}
+        onError={(e) => console.error('Video error:', e)}
       />
     );
   };
