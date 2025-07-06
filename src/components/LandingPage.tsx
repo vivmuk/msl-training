@@ -1,183 +1,222 @@
 import React from 'react';
+import { motion } from 'framer-motion';
 
 interface LandingPageProps {
-  onStartDemo: () => void;
+  onStartDemo: (scenario: string) => void;
 }
 
 const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo }) => {
+  const benefits = [
+    {
+      icon: "🎯",
+      title: "Risk-Free Practice",
+      description: "Practice complex clinical conversations without the pressure of real HCP interactions. Make mistakes, learn, and improve safely."
+    },
+    {
+      icon: "⚡",
+      title: "Real-Time Feedback",
+      description: "Get immediate responses and clinical questions from AI-powered HCPs. Experience realistic pushback and challenging scenarios."
+    },
+    {
+      icon: "📈",
+      title: "Scalable Training",
+      description: "Train entire field medical teams consistently. Available 24/7 with no scheduling conflicts or geographical limitations."
+    },
+    {
+      icon: "🎭",
+      title: "Scenario-Based Learning",
+      description: "Practice specific therapeutic areas with specialized HCP avatars. Today's demos cover multiple interaction types."
+    },
+    {
+      icon: "📊",
+      title: "Performance Tracking",
+      description: "Monitor progress over time with detailed analytics. Identify strengths and areas for improvement in your clinical conversations."
+    },
+    {
+      icon: "💰",
+      title: "Cost-Effective",
+      description: "Reduce training costs compared to traditional role-play sessions. No travel, no scheduling conflicts, maximum ROI on training investment."
+    }
+  ];
+
+  const scenarios = [
+    {
+      id: 'alex',
+      doctorName: 'Dr. Alex',
+      specialty: 'Cardiologist',
+      description: 'Dr. Alex, a seasoned cardiologist in a major academic center',
+      objective: 'Field Medical sharing new clinical data',
+      focusArea: 'Tafamidis dose comparison discussion',
+      difficulty: 'Advanced',
+      difficultyColor: 'bg-red-500',
+      avatar: '👨‍⚕️',
+      bgColor: 'bg-gradient-to-br from-red-50 to-red-100',
+      scenario: 'Present complex clinical data to a time-pressed, highly knowledgeable cardiologist. Practice handling sharp questions and data challenges.'
+    },
+    {
+      id: 'ena',
+      doctorName: 'Dr. Ena',
+      specialty: 'General Medicine',
+      description: 'Dr. Ena, a warm, thoughtful, and scientifically curious academic oncologist',
+      objective: 'Building relationship and understanding needs',
+      focusArea: 'Initial introduction and needs assessment',
+      difficulty: 'Beginner',
+      difficultyColor: 'bg-green-500',
+      avatar: '👩‍⚕️',
+      bgColor: 'bg-gradient-to-br from-green-50 to-green-100',
+      scenario: 'First-time meeting with a warm, receptive HCP. Practice introductions, relationship building, and needs discovery.'
+    },
+    {
+      id: 'dat',
+      doctorName: 'Dr. Dat',
+      specialty: 'Clinical Research',
+      description: 'Dr. Dat, a pragmatic and highly respected oncology principal investigator',
+      objective: 'Understanding enrollment barriers',
+      focusArea: 'Trial enrollment and site support',
+      difficulty: 'Intermediate',
+      difficultyColor: 'bg-yellow-500',
+      avatar: '🔬',
+      bgColor: 'bg-gradient-to-br from-yellow-50 to-yellow-100',
+      scenario: 'Investigate why clinical trial enrollment is slower than expected. Practice problem-solving and investigative questioning.'
+    }
+  ];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 overflow-hidden">
+      {/* Compact Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                🩺 Field Medical Training Platform
-              </h1>
-              <p className="text-gray-600">AI-Powered HCP Interaction Training</p>
+          <div className="flex justify-between items-center py-1.5">
+            <div className="flex items-center">
+              <div className="text-lg mr-2">🩺</div>
+              <div>
+                <h1 className="text-base font-bold text-gray-900">Field Medical Training Platform</h1>
+                <p className="text-xs text-gray-600">AI-Powered HCP Interaction Training</p>
+              </div>
             </div>
             <div className="text-right">
-              <p className="text-sm text-gray-500">AI Trainer Demo tool developed by Ex-Field Folks for Field Medical</p>
-              <p className="text-sm font-medium text-blue-600">(Created by Sejal and Vivek)</p>
+              <p className="text-xs text-gray-500">AI Trainer Demo tool developed by Ex-Field Folks for Field Medical</p>
+              <p className="text-xs font-medium text-blue-600">(Created by Sejal and Vivek)</p>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-                      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
-          {/* Hero Section */}
-          <div className="text-center mb-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">
-              Transform Field Medical Training with AI
-            </h2>
-            <p className="text-sm text-gray-600 max-w-xl mx-auto mb-3">
-              Practice critical HCP interactions in a safe, controlled environment with our AI-powered cardiologist avatar. 
-              Get real-time feedback and improve your clinical conversation skills.
-            </p>
-            <div className="flex justify-center">
-              <button
-                onClick={onStartDemo}
-                className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors duration-200 shadow-lg"
+      {/* Main Content Container */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        {/* Compact Hero Section */}
+        <div className="text-center mb-3">
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-2xl font-bold text-gray-900 mb-1"
+          >
+            Transform Field Medical Training with AI
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-sm text-gray-600 max-w-3xl mx-auto"
+          >
+            Practice critical HCP interactions in a safe, controlled environment with our AI-powered avatars. Get real-time feedback and improve your clinical conversation skills.
+          </motion.p>
+        </div>
+
+        {/* Benefits Section - Compact Grid */}
+        <div className="mb-3">
+          <h2 className="text-base font-bold text-gray-900 mb-2 text-center">Why Choose AI Training?</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+            {benefits.map((benefit, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
               >
-                Start Training Demo
-              </button>
-            </div>
-          </div>
-
-          {/* Benefits Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-5">
-            {/* Benefit 1 */}
-            <div className="bg-white rounded-lg shadow-lg p-3">
-              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
-                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Risk-Free Practice</h3>
-              <p className="text-xs text-gray-600">
-                Practice complex clinical conversations without the pressure of real HCP interactions. Make mistakes, learn, and improve safely.
-              </p>
-            </div>
-
-            {/* Benefit 2 */}
-            <div className="bg-white rounded-lg shadow-lg p-3">
-              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mb-2">
-                <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Real-Time Feedback</h3>
-              <p className="text-xs text-gray-600">
-                Get immediate responses and clinical questions from AI-powered HCPs. Experience realistic pushback and challenging scenarios.
-              </p>
-            </div>
-
-            {/* Benefit 3 */}
-            <div className="bg-white rounded-lg shadow-lg p-3">
-              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mb-2">
-                <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Scalable Training</h3>
-              <p className="text-xs text-gray-600">
-                Train entire field medical teams consistently. Available 24/7 with no scheduling conflicts or geographical limitations.
-              </p>
-            </div>
-
-            {/* Benefit 4 */}
-            <div className="bg-white rounded-lg shadow-lg p-3">
-              <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center mb-2">
-                <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Scenario-Based Learning</h3>
-              <p className="text-xs text-gray-600">
-                Practice specific therapeutic areas with specialized HCP avatars. Today's demo: tafamidis dose comparison with a cardiologist.
-              </p>
-            </div>
-
-            {/* Benefit 5 */}
-            <div className="bg-white rounded-lg shadow-lg p-3">
-              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mb-2">
-                <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Performance Tracking</h3>
-              <p className="text-xs text-gray-600">
-                Monitor progress over time with detailed analytics. Identify strengths and areas for improvement in your clinical conversations.
-              </p>
-            </div>
-
-            {/* Benefit 6 */}
-            <div className="bg-white rounded-lg shadow-lg p-3">
-              <div className="w-8 h-8 bg-teal-100 rounded-lg flex items-center justify-center mb-2">
-                <svg className="w-4 h-4 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Cost-Effective</h3>
-              <p className="text-xs text-gray-600">
-                Reduce training costs compared to traditional role-play sessions. No travel, no scheduling conflicts, maximum ROI on training investment.
-              </p>
-            </div>
-          </div>
-
-        {/* Demo Scenario Section */}
-        <div className="bg-white rounded-lg shadow-lg p-3 mb-3">
-          <h3 className="text-sm font-bold text-gray-900 mb-2 text-center">Today's Training Scenario</h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div>
-              <h4 className="text-xs font-semibold text-gray-900 mb-1">🎯 Training Objective</h4>
-              <p className="text-xs text-gray-600 mb-2">
-                Master presenting complex clinical data to a cardiologist. Practice discussing tafamidis dose comparison data 
-                from the ATTR-ACT trial.
-              </p>
-              <h4 className="text-xs font-semibold text-gray-900 mb-1">👨‍⚕️ Your HCP Today</h4>
-              <p className="text-xs text-gray-600">
-                <strong>Dr. Alex</strong> - Experienced cardiologist specializing in heart failure and ATTR-CM.
-              </p>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold text-gray-900 mb-1">📊 Key Discussion Points</h4>
-              <ul className="space-y-0.5 text-xs text-gray-600">
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-1">•</span>
-                  30% mortality reduction with 80mg vs 20mg tafamidis
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-1">•</span>
-                  Earlier functional benefits with higher dose
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-1">•</span>
-                  Biomarker differences and clinical significance
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-1">•</span>
-                  Safety profile and patient selection criteria
-                </li>
-              </ul>
-            </div>
+                <div className="flex items-start">
+                  <div className="text-base mr-2 flex-shrink-0">{benefit.icon}</div>
+                  <div>
+                    <h3 className="text-xs font-semibold text-gray-900 mb-1">{benefit.title}</h3>
+                    <p className="text-xs text-gray-600 leading-tight">{benefit.description}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
           </div>
         </div>
 
-        {/* CTA Section */}
-        <div className="text-center">
-          <h3 className="text-sm font-bold text-gray-900 mb-1">Ready to Transform Field Medical Training?</h3>
-          <p className="text-xs text-gray-600 mb-3 max-w-md mx-auto">
+        {/* Training Scenarios Section */}
+        <div className="mb-2">
+          <h2 className="text-base font-bold text-gray-900 mb-2 text-center">Choose Your Training Scenario</h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {scenarios.map((scenario, index) => (
+              <motion.div
+                key={scenario.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+                className={`${scenario.bgColor} rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1`}
+              >
+                <div className="p-3">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-2xl">{scenario.avatar}</div>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${scenario.difficultyColor}`}>
+                      {scenario.difficulty}
+                    </span>
+                  </div>
+
+                  {/* Doctor Info */}
+                  <h3 className="text-base font-bold text-gray-900 mb-1">{scenario.doctorName}</h3>
+                  <p className="text-sm text-blue-600 font-medium mb-1">{scenario.specialty}</p>
+                  <p className="text-xs text-gray-600 mb-2">{scenario.description}</p>
+
+                  {/* Scenario Details */}
+                  <div className="space-y-1 mb-3">
+                    <div>
+                      <span className="text-xs font-semibold text-gray-700">Objective:</span>
+                      <p className="text-xs text-gray-600">{scenario.objective}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-gray-700">Focus Area:</span>
+                      <p className="text-xs text-gray-600">{scenario.focusArea}</p>
+                    </div>
+                    <div>
+                      <span className="text-xs font-semibold text-gray-700">Scenario:</span>
+                      <p className="text-xs text-gray-600">{scenario.scenario}</p>
+                    </div>
+                  </div>
+
+                  {/* Action Button */}
+                  <button
+                    onClick={() => onStartDemo(scenario.id)}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors duration-200 flex items-center justify-center text-sm"
+                  >
+                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.5a1.5 1.5 0 011.5 1.5V12a1.5 1.5 0 01-1.5 1.5H9m8.485-4.243L15.657 7.93A1.5 1.5 0 0014.242 7.5H12a1.5 1.5 0 00-1.5 1.5v2.121m0 0a4 4 0 105.656 0M9 10v2.121" />
+                    </svg>
+                    Start Training with {scenario.doctorName}
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+
+        {/* Bottom CTA Section */}
+        <div className="text-center p-2 bg-blue-50 rounded-lg">
+          <h3 className="text-sm font-bold text-gray-900 mb-1">Ready to Transform Your Field Medical Skills?</h3>
+          <p className="text-xs text-gray-600 mb-1">
             Experience the future of field medical education. Practice with AI-powered HCPs and build confidence.
           </p>
-          <button
-            onClick={onStartDemo}
-            className="bg-blue-600 text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors duration-200 shadow-lg"
-          >
-            Launch Training Session
-          </button>
+          <div className="flex justify-center space-x-4 text-xs text-gray-500">
+            <span>✓ No API keys required</span>
+            <span>✓ Real-time conversation</span>
+            <span>✓ Instant feedback</span>
+            <span>✓ Performance tracking</span>
+          </div>
         </div>
       </div>
     </div>
