@@ -56,7 +56,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo }) => {
     {
       id: 'ena',
       doctorName: 'Dr. Ena',
-      specialty: 'General Medicine',
+      specialty: 'Academic oncologist',
       description: 'Dr. Ena, a warm, thoughtful, and scientifically curious academic oncologist',
       objective: 'Building relationship and understanding needs',
       focusArea: 'Initial introduction and needs assessment',
