@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import UserCamera from './components/UserCamera';
 import LandingPage from './components/LandingPage';
+import LiveTranscript from './components/LiveTranscript';
+import PerformanceReview from './components/PerformanceReview';
+import { LiveTranscriptRecorder, TranscriptEntry } from './services/liveTranscript';
+import { analyzeSession, SessionAnalysis } from './services/claudeAnalysis';
 import './App.css';
 
 // Scenario data structure
@@ -32,6 +36,14 @@ const App: React.FC = () => {
   const [heyGenError, setHeyGenError] = useState(false);
   const [userCameraReady, setUserCameraReady] = useState(false);
   const [showHeyGenIframe, setShowHeyGenIframe] = useState(false);
+
+  // Transcript + analysis state
+  const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [sessionAnalysis, setSessionAnalysis] = useState<SessionAnalysis | null>(null);
+  const [sessionStartTime, setSessionStartTime] = useState(0);
+  const recorderRef = useRef<LiveTranscriptRecorder | null>(null);
 
   const currentScenario = scenarios[selectedScenario as keyof typeof scenarios];
 
@@ -82,8 +94,28 @@ const App: React.FC = () => {
     };
   }, [currentPage, isHeyGenReady, selectedScenario]);
 
-  const handleUserCameraReady = () => {
+  const handleUserCameraReady = (stream: MediaStream) => {
     setUserCameraReady(true);
+
+    const veniceKey = process.env.REACT_APP_VENICE_API_KEY;
+    if (!veniceKey) return;
+
+    const recorder = new LiveTranscriptRecorder(veniceKey, (entry: TranscriptEntry) => {
+      setTranscriptEntries(prev => {
+        const idx = prev.findIndex(e => e.id === entry.id);
+        if (idx >= 0) {
+          if (!entry.text) return prev.filter(e => e.id !== entry.id);
+          const next = [...prev];
+          next[idx] = entry;
+          return next;
+        }
+        if (!entry.text) return prev;
+        return [...prev, entry];
+      });
+    });
+    recorder.start(stream);
+    recorderRef.current = recorder;
+    setIsRecording(true);
   };
 
   const handleUserCameraError = (error: Error) => {
@@ -92,12 +124,46 @@ const App: React.FC = () => {
 
   const handleStartDemo = (scenarioId: string) => {
     setSelectedScenario(scenarioId);
+    setTranscriptEntries([]);
+    setSessionAnalysis(null);
+    setSessionStartTime(Date.now());
     setCurrentPage('training');
   };
 
   const handleBackToLanding = () => {
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    setIsRecording(false);
     setCurrentPage('landing');
     setSelectedScenario('alex');
+    setTranscriptEntries([]);
+    setSessionAnalysis(null);
+  };
+
+  const handleEndSession = async () => {
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    setIsRecording(false);
+
+    const anthropicKey = process.env.REACT_APP_ANTHROPIC_API_KEY;
+    if (anthropicKey) {
+      setIsAnalyzing(true);
+      try {
+        const scenario = scenarios[selectedScenario as keyof typeof scenarios];
+        const analysis = await analyzeSession(
+          transcriptEntries,
+          { doctorName: scenario.doctorName, specialty: scenario.specialty, focusArea: scenario.description },
+          anthropicKey,
+        );
+        setSessionAnalysis(analysis);
+      } catch (err) {
+        console.error('Session analysis failed:', err);
+      } finally {
+        setIsAnalyzing(false);
+      }
+    }
+
+    setCurrentPage('review');
   };
 
   const retryHeyGenLoad = () => {
@@ -260,6 +326,18 @@ const App: React.FC = () => {
     return <LandingPage onStartDemo={handleStartDemo} />;
   }
 
+  if (currentPage === 'review') {
+    const scenario = scenarios[selectedScenario as keyof typeof scenarios];
+    return (
+      <PerformanceReview
+        onReturnHome={handleBackToLanding}
+        duration={Math.floor((Date.now() - sessionStartTime) / 1000)}
+        scenario={{ doctorName: scenario.doctorName, specialty: scenario.specialty }}
+        analysis={sessionAnalysis}
+      />
+    );
+  }
+
   const trainingScript = getTrainingScript();
 
   return (
@@ -280,7 +358,23 @@ const App: React.FC = () => {
                 </span>
               </div>
             </div>
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-3">
+              {isAnalyzing ? (
+                <div className="flex items-center text-blue-600 text-sm font-medium">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2" />
+                  Analyzing session…
+                </div>
+              ) : (
+                <button
+                  onClick={handleEndSession}
+                  className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                  <span>End &amp; Analyze</span>
+                </button>
+              )}
               <button
                 onClick={handleBackToLanding}
                 className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
@@ -392,6 +486,11 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Live Transcript */}
+        <div className="mb-6">
+          <LiveTranscript entries={transcriptEntries} isRecording={isRecording} />
         </div>
 
         {/* How to Use Guide */}
