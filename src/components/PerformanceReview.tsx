@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { ArrowPathIcon, CheckCircleIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
 import { SessionAnalysis } from '../services/claudeAnalysis';
 
 interface PerformanceReviewProps {
@@ -7,6 +8,11 @@ interface PerformanceReviewProps {
   duration: number;
   scenario: { doctorName: string; specialty: string };
   analysis: SessionAnalysis | null;
+  isAnalyzing?: boolean;
+  analysisError?: string;
+  hasAnalysisKey?: boolean;
+  hasTranscript?: boolean;
+  onGenerateAnalysis?: () => void;
 }
 
 const ScoreCircle: React.FC<{ score: number; label: string; size?: 'small' | 'large' }> = ({
@@ -58,6 +64,11 @@ const PerformanceReview: React.FC<PerformanceReviewProps> = ({
   duration,
   scenario,
   analysis,
+  isAnalyzing = false,
+  analysisError = '',
+  hasAnalysisKey = false,
+  hasTranscript = false,
+  onGenerateAnalysis,
 }) => {
   const mins = Math.floor(duration / 60);
   const secs = (duration % 60).toString().padStart(2, '0');
@@ -122,8 +133,32 @@ const PerformanceReview: React.FC<PerformanceReviewProps> = ({
 
         {!analysis ? (
           <div className="bg-white rounded-lg shadow-sm p-10 text-center text-gray-500">
-            <p className="text-lg font-medium mb-2">No analysis available</p>
-            <p className="text-sm">Add <code className="bg-gray-100 px-1 rounded">REACT_APP_ANTHROPIC_API_KEY</code> to your <code className="bg-gray-100 px-1 rounded">.env</code> to enable AI-powered scoring.</p>
+            <p className="text-lg font-medium mb-2">{isAnalyzing ? 'Analyzing session...' : 'No analysis available'}</p>
+            <p className="text-sm">
+              {hasAnalysisKey
+                ? hasTranscript
+                  ? 'Venice is configured. Generate or rerun analysis for this captured transcript.'
+                  : 'Venice is configured, but no transcript was captured. Type responses or allow microphone access during training.'
+                : hasTranscript
+                ? 'Generate local transcript analysis now, or save a Venice key on the dashboard for online AI scoring.'
+                : 'Type responses or allow microphone access during training. Save a Venice key on the dashboard for online AI scoring.'}
+            </p>
+            {analysisError && <p className="mt-3 text-sm font-medium text-amber-700">{analysisError}</p>}
+            <div className="mt-6 flex justify-center gap-3">
+              <button
+                onClick={onGenerateAnalysis}
+                disabled={isAnalyzing || !hasTranscript}
+                className="rounded-lg bg-primary-600 px-5 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:bg-gray-300"
+              >
+                {isAnalyzing ? 'Analyzing...' : 'Generate Analysis'}
+              </button>
+              <button
+                onClick={onReturnHome}
+                className="rounded-lg border border-gray-300 bg-white px-5 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+              >
+                Add API Key
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -199,7 +234,7 @@ const PerformanceReview: React.FC<PerformanceReviewProps> = ({
                 {analysis.strengths.map((s, i) => (
                   <div key={i} className="p-4 rounded-lg border-l-4 bg-green-50 border-green-400">
                     <div className="flex items-start space-x-2">
-                      <span className="text-xl">✅</span>
+                      <CheckCircleIcon className="h-5 w-5 flex-shrink-0 text-green-700" />
                       <div>
                         <h4 className="font-semibold text-green-800">{s.title}</h4>
                         <p className="text-sm mt-1 text-green-700">{s.description}</p>
@@ -210,7 +245,7 @@ const PerformanceReview: React.FC<PerformanceReviewProps> = ({
                 {analysis.improvements.map((im, i) => (
                   <div key={i} className="p-4 rounded-lg border-l-4 bg-orange-50 border-orange-400">
                     <div className="flex items-start space-x-2">
-                      <span className="text-xl">⚠️</span>
+                      <ExclamationTriangleIcon className="h-5 w-5 flex-shrink-0 text-orange-700" />
                       <div>
                         <h4 className="font-semibold text-orange-800">{im.title}</h4>
                         <p className="text-sm mt-1 text-orange-700">{im.description}</p>
@@ -220,6 +255,38 @@ const PerformanceReview: React.FC<PerformanceReviewProps> = ({
                 ))}
               </div>
             </motion.div>
+
+            {analysis.moments?.length ? (
+              <motion.div
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.6 }}
+                className="bg-white rounded-lg shadow-sm p-6 mb-6"
+              >
+                <h3 className="text-xl font-semibold text-gray-900 mb-4">Top Transcript Moments</h3>
+                <div className="space-y-4">
+                  {analysis.moments.slice(0, 3).map((moment, i) => (
+                    <div key={i} className="rounded-lg border border-gray-200 p-4">
+                      <h4 className="font-semibold text-gray-900">{moment.title}</h4>
+                      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+                        <div className="rounded-md bg-gray-50 p-3">
+                          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">What you said</p>
+                          <p className="mt-1 text-sm text-gray-700">{moment.whatYouSaid}</p>
+                        </div>
+                        <div className="rounded-md bg-blue-50 p-3">
+                          <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Better version</p>
+                          <p className="mt-1 text-sm text-blue-900">{moment.betterVersion}</p>
+                        </div>
+                        <div className="rounded-md bg-amber-50 p-3">
+                          <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Missed opportunity</p>
+                          <p className="mt-1 text-sm text-amber-900">{moment.missedOpportunity}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            ) : null}
 
             {/* Next steps */}
             <motion.div
@@ -237,6 +304,18 @@ const PerformanceReview: React.FC<PerformanceReviewProps> = ({
                   </div>
                 ))}
               </div>
+              {analysis.nextScenarioRecommendation && (
+                <div className="mt-5 rounded-lg bg-white bg-opacity-10 p-4">
+                  <div className="flex items-start gap-3">
+                    <ArrowPathIcon className="h-6 w-6 flex-shrink-0" />
+                    <div>
+                      <h4 className="font-semibold">Recommended Next Scenario: {analysis.nextScenarioRecommendation.title}</h4>
+                      <p className="mt-1 text-sm opacity-90">{analysis.nextScenarioRecommendation.rationale}</p>
+                      <p className="mt-1 text-sm font-medium">Focus: {analysis.nextScenarioRecommendation.focus}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </>
         )}

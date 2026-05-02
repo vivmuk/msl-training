@@ -1,226 +1,646 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import {
+  AcademicCapIcon,
+  ArrowRightIcon,
+  ChartBarIcon,
+  ClockIcon,
+  Cog6ToothIcon,
+  DocumentChartBarIcon,
+  ShieldCheckIcon,
+} from '@heroicons/react/24/outline';
+import {
+  ATTR_CM_FALLBACK_SCENARIO,
+  generateAttrCmScenario,
+  TrainingScenarioDraft,
+} from '../services/scenarioGenerator';
+import {
+  createHeyGenTrainingVideoSession,
+  getHeyGenTrainingVideoSession,
+  HeyGenAgentSession,
+  sendHeyGenTrainingVideoMessage,
+} from '../services/heygenVideoAgent';
 
 interface LandingPageProps {
   onStartDemo: (scenario: string) => void;
+  onScenarioCreated?: (scenario: TrainingScenarioDraft) => void;
+  generatedScenario?: TrainingScenarioDraft | null;
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo }) => {
-  const benefits = [
-    {
-      icon: "🎯",
-      title: "Risk-Free Practice",
-      description: "Practice complex clinical conversations without the pressure of real HCP interactions. Make mistakes, learn, and improve safely."
-    },
-    {
-      icon: "⚡",
-      title: "Real-Time Feedback",
-      description: "Get immediate responses and clinical questions from AI-powered HCPs. Experience realistic pushback and challenging scenarios."
-    },
-    {
-      icon: "📈",
-      title: "Scalable Training",
-      description: "Train entire field medical teams consistently. Available 24/7 with no scheduling conflicts or geographical limitations."
-    },
-    {
-      icon: "🎭",
-      title: "Scenario-Based Learning",
-      description: "Practice specific therapeutic areas with specialized HCP avatars. Today's demos cover multiple interaction types."
-    },
-    {
-      icon: "📊",
-      title: "Performance Tracking",
-      description: "Monitor progress over time with detailed analytics. Identify strengths and areas for improvement in your clinical conversations."
-    },
-    {
-      icon: "💰",
-      title: "Cost-Effective",
-      description: "Reduce training costs compared to traditional role-play sessions. No travel, no scheduling conflicts, maximum ROI on training investment."
-    }
-  ];
+const scenarios = [
+  {
+    id: 'alex',
+    doctorName: 'Dr. Alex',
+    specialty: 'Cardiologist',
+    difficulty: 'Advanced',
+    difficultyStyle: 'bg-red-50 text-red-700 ring-red-200',
+    trainingGoal: 'Practice data challenge',
+    challenge: 'Sharp questions on tafamidis dose comparison and evidence strength.',
+    time: '18 min',
+    action: 'Start Data Challenge',
+    image:
+      'https://files2.heygen.ai/avatar/v3/88d421f939044bb08d892e833931948b_45590/preview_talk_1.webp',
+    metrics: { score: 82, status: 'Live-ready' },
+  },
+  {
+    id: 'ena',
+    doctorName: 'Dr. Ena',
+    specialty: 'Academic Oncologist',
+    difficulty: 'Beginner',
+    difficultyStyle: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    trainingGoal: 'Build first relationship',
+    challenge: 'Open a first meeting, discover needs, and earn permission to follow up.',
+    time: '12 min',
+    action: 'Start Relationship Practice',
+    image:
+      'https://files2.heygen.ai/avatar/v3/022cdb1f07914e75887c693f0c5f97df_45650/preview_talk_1.webp',
+    metrics: { score: 88, status: 'Recommended' },
+  },
+  {
+    id: 'dat',
+    doctorName: 'Dr. Dat',
+    specialty: 'Clinical Research',
+    difficulty: 'Intermediate',
+    difficultyStyle: 'bg-amber-50 text-amber-700 ring-amber-200',
+    trainingGoal: 'Investigate enrollment barrier',
+    challenge: 'Probe site friction without leading the PI or overpromising fixes.',
+    time: '16 min',
+    action: 'Start Enrollment Practice',
+    image:
+      'https://files2.heygen.ai/avatar/v3/33c9ac4aead44dfc8bc0082a35062a70_45580/preview_talk_3.webp',
+    metrics: { score: 76, status: 'Skill builder' },
+  },
+];
 
-  const scenarios = [
-    {
-      id: 'alex',
-      doctorName: 'Dr. Alex',
-      specialty: 'Cardiologist',
-      description: 'Dr. Alex, a seasoned cardiologist in a major academic center',
-      objective: 'Field Medical sharing new clinical data',
-      focusArea: 'Tafamidis dose comparison discussion',
-      difficulty: 'Advanced',
-      difficultyColor: 'bg-red-500',
-      avatar: '👨‍⚕️',
-      bgColor: 'bg-gradient-to-br from-red-50 to-red-100',
-      scenario: 'Present complex clinical data to a time-pressed, highly knowledgeable cardiologist. Practice handling sharp questions and data challenges.'
-    },
-    {
-      id: 'ena',
-      doctorName: 'Dr. Ena',
-      specialty: 'Academic oncologist',
-      description: 'Dr. Ena, a warm, thoughtful, and scientifically curious academic oncologist',
-      objective: 'Building relationship and understanding needs',
-      focusArea: 'Initial introduction and needs assessment',
-      difficulty: 'Beginner',
-      difficultyColor: 'bg-green-500',
-      avatar: '👩‍⚕️',
-      bgColor: 'bg-gradient-to-br from-green-50 to-green-100',
-      scenario: 'First-time meeting with a warm, receptive HCP. Practice introductions, relationship building, and needs discovery.'
-    },
-    {
-      id: 'dat',
-      doctorName: 'Dr. Dat',
-      specialty: 'Clinical Research',
-      description: 'Dr. Dat, a pragmatic and highly respected oncology principal investigator',
-      objective: 'Understanding enrollment barriers',
-      focusArea: 'Trial enrollment and site support',
-      difficulty: 'Intermediate',
-      difficultyColor: 'bg-yellow-500',
-      avatar: '🔬',
-      bgColor: 'bg-gradient-to-br from-yellow-50 to-yellow-100',
-      scenario: 'Investigate why clinical trial enrollment is slower than expected. Practice problem-solving and investigative questioning.'
+const recentSessions = [
+  { label: 'Scientific exchange', score: 84, trend: '+6 pts' },
+  { label: 'Discovery quality', score: 78, trend: '+3 pts' },
+  { label: 'Compliance posture', score: 92, trend: 'Stable' },
+];
+
+const workflow = ['Opening', 'Discovery', 'Evidence', 'Objection', 'Close'];
+
+const benefits = [
+  {
+    icon: ShieldCheckIcon,
+    title: 'Risk-Free Practice',
+    description: 'Practice complex clinical conversations without the pressure of real HCP interactions.',
+  },
+  {
+    icon: AcademicCapIcon,
+    title: 'Real-Time Feedback',
+    description: 'Get immediate coaching signals, realistic pushback, and scenario-specific conversation cues.',
+  },
+  {
+    icon: ChartBarIcon,
+    title: 'Performance Tracking',
+    description: 'Monitor progress over time and identify where scientific exchange or discovery skills need work.',
+  },
+  {
+    icon: DocumentChartBarIcon,
+    title: 'Scenario-Based Learning',
+    description: 'Train against specific HCP profiles, therapeutic contexts, and field medical objectives.',
+  },
+  {
+    icon: ClockIcon,
+    title: 'Scalable Training',
+    description: 'Give field teams consistent practice without scheduling, travel, or role-play constraints.',
+  },
+  {
+    icon: Cog6ToothIcon,
+    title: 'Cost-Effective Enablement',
+    description: 'Use repeatable AI sessions to reinforce training between workshops and live coaching.',
+  },
+];
+
+const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreated, generatedScenario }) => {
+  const [builderInput, setBuilderInput] = useState({
+    audience: 'New MSLs preparing for cardiology field visits',
+    difficulty: 'Intermediate',
+    goal: 'Practice diagnosing workflow barriers in ATTR-CM',
+    clinicalFocus: 'HFpEF red flags, PYP scan access, lab workup, and referral sequencing',
+    hcpPersona: 'Skeptical cardiologist with limited time and inconsistent scan interpretation support',
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [builderError, setBuilderError] = useState('');
+  const [videoSession, setVideoSession] = useState<HeyGenAgentSession | null>(null);
+  const [videoFeedback, setVideoFeedback] = useState('');
+  const [videoStatus, setVideoStatus] = useState('');
+  const [apiKeys, setApiKeys] = useState({ venice: '', heygen: '' });
+  const [savedKeys, setSavedKeys] = useState(() => ({
+    venice: Boolean(window.localStorage.getItem('VENICE_API_KEY')),
+    heygen: Boolean(window.localStorage.getItem('HEYGEN_API_KEY')),
+  }));
+
+  const customScenario = generatedScenario
+    ? {
+        id: 'custom',
+        doctorName: generatedScenario.doctorName,
+        specialty: generatedScenario.specialty,
+        difficulty: generatedScenario.difficulty,
+        difficultyStyle:
+          generatedScenario.difficulty === 'Advanced'
+            ? 'bg-red-50 text-red-700 ring-red-200'
+            : generatedScenario.difficulty === 'Beginner'
+            ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+            : 'bg-amber-50 text-amber-700 ring-amber-200',
+        trainingGoal: generatedScenario.trainingGoal,
+        challenge: generatedScenario.expectedChallenge,
+        time: generatedScenario.estimatedTime,
+        action: 'Start Generated Scenario',
+        image:
+          'https://files2.heygen.ai/avatar/v3/88d421f939044bb08d892e833931948b_45590/preview_talk_1.webp',
+        metrics: { score: 0, status: 'Generated' },
+      }
+    : null;
+  const scenarioCards = customScenario ? [...scenarios, customScenario] : scenarios;
+
+  const updateBuilder = (field: keyof typeof builderInput, value: string) => {
+    setBuilderInput(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleGenerateScenario = async () => {
+    setIsGenerating(true);
+    setBuilderError('');
+
+    const apiKey =
+      apiKeys.venice ||
+      process.env.REACT_APP_VENICE_API_KEY ||
+      window.localStorage.getItem('VENICE_API_KEY') ||
+      window.localStorage.getItem('REACT_APP_VENICE_API_KEY') ||
+      '';
+
+    try {
+      const scenario = apiKey
+        ? await generateAttrCmScenario(builderInput, apiKey)
+        : {
+            ...ATTR_CM_FALLBACK_SCENARIO,
+            id: `generated-${Date.now()}`,
+            trainingGoal: builderInput.goal,
+            expectedChallenge: builderInput.hcpPersona,
+            focusArea: builderInput.clinicalFocus,
+          };
+      onScenarioCreated?.(scenario);
+    } catch (error) {
+      console.error('Scenario generation failed:', error);
+      setBuilderError('Venice scenario generation failed, so a safe ATTR-CM fallback was loaded.');
+      onScenarioCreated?.({ ...ATTR_CM_FALLBACK_SCENARIO, id: `generated-${Date.now()}` });
+    } finally {
+      setIsGenerating(false);
     }
-  ];
+  };
+
+  const getHeyGenKey = () =>
+    apiKeys.heygen ||
+    process.env.REACT_APP_HEYGEN_API_KEY ||
+    window.localStorage.getItem('HEYGEN_API_KEY') ||
+    window.localStorage.getItem('REACT_APP_HEYGEN_API_KEY') ||
+    '';
+
+  const saveLocalKeys = () => {
+    if (apiKeys.venice) window.localStorage.setItem('VENICE_API_KEY', apiKeys.venice);
+    if (apiKeys.heygen) window.localStorage.setItem('HEYGEN_API_KEY', apiKeys.heygen);
+    setSavedKeys({
+      venice: Boolean(apiKeys.venice || window.localStorage.getItem('VENICE_API_KEY')),
+      heygen: Boolean(apiKeys.heygen || window.localStorage.getItem('HEYGEN_API_KEY')),
+    });
+    setApiKeys({ venice: '', heygen: '' });
+    setBuilderError('Local API settings saved in this browser only.');
+  };
+
+  const handleCreateVideoStoryboard = async () => {
+    if (!generatedScenario) return;
+    const apiKey = getHeyGenKey();
+    if (!apiKey) {
+      setVideoStatus('Add a HeyGen API key to REACT_APP_HEYGEN_API_KEY or localStorage to create storyboard sessions.');
+      return;
+    }
+
+    setVideoStatus('Creating HeyGen storyboard session...');
+    try {
+      const session = await createHeyGenTrainingVideoSession(generatedScenario, apiKey);
+      setVideoSession(session);
+      setVideoStatus('Storyboard session created. Poll for review status in a few seconds.');
+    } catch (error) {
+      console.error('HeyGen session creation failed:', error);
+      setVideoStatus('HeyGen storyboard session failed. Check the API key and account access.');
+    }
+  };
+
+  const handlePollVideoStoryboard = async () => {
+    if (!videoSession) return;
+    const apiKey = getHeyGenKey();
+    if (!apiKey) return;
+    setVideoStatus('Checking HeyGen session...');
+    try {
+      const session = await getHeyGenTrainingVideoSession(videoSession.session_id, apiKey);
+      setVideoSession(session);
+      setVideoStatus(`Session status: ${session.status}${session.progress != null ? ` (${session.progress}%)` : ''}`);
+    } catch (error) {
+      console.error('HeyGen polling failed:', error);
+      setVideoStatus('Could not refresh HeyGen session status.');
+    }
+  };
+
+  const handleSendVideoFeedback = async (autoProceed = false) => {
+    if (!videoSession) return;
+    const apiKey = getHeyGenKey();
+    if (!apiKey || !videoFeedback.trim()) return;
+    setVideoStatus(autoProceed ? 'Approving storyboard and generating video...' : 'Sending storyboard feedback...');
+    try {
+      await sendHeyGenTrainingVideoMessage(videoSession.session_id, videoFeedback.trim(), apiKey, autoProceed);
+      setVideoFeedback('');
+      await handlePollVideoStoryboard();
+    } catch (error) {
+      console.error('HeyGen feedback failed:', error);
+      setVideoStatus('Could not send HeyGen storyboard feedback.');
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-100 overflow-hidden">
-      {/* Compact Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-1.5">
-            <div className="flex items-center">
-              <div className="text-lg mr-2">🩺</div>
-              <div>
-                <h1 className="text-base font-bold text-gray-900">Field Medical Training Platform</h1>
-                <p className="text-xs text-gray-600">AI-Powered HCP Interaction Training</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-gray-500">AI Trainer Demo tool developed by Ex-Field Folks for Field Medical</p>
-              <p className="text-xs font-medium text-blue-600">(Created by Sejal and Vivek)</p>
-            </div>
+    <div className="min-h-screen bg-slate-50 text-slate-950">
+      <header className="border-b border-slate-200 bg-white">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Field Medical Training</p>
+            <h1 className="text-xl font-bold text-slate-950 sm:text-2xl">MSL Training Cockpit</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <button className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 sm:flex">
+              <DocumentChartBarIcon className="h-4 w-4" />
+              Session History
+            </button>
+            <button className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
+              <Cog6ToothIcon className="h-4 w-4" />
+              Settings
+            </button>
           </div>
         </div>
       </header>
 
-      {/* Main Content Container */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-        {/* Compact Hero Section */}
-        <div className="text-center mb-3">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-bold text-gray-900 mb-1"
-          >
-            Transform Field Medical Training with AI
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="text-sm text-gray-600 max-w-3xl mx-auto"
-          >
-            Practice critical HCP interactions in a safe, controlled environment with our AI-powered avatars. Get real-time feedback and improve your clinical conversation skills.
-          </motion.p>
-        </div>
-
-        {/* Benefits Section - Compact Grid */}
-        <div className="mb-3">
-          <h2 className="text-base font-bold text-gray-900 mb-2 text-center">Why Choose AI Training?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-            {benefits.map((benefit, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="bg-white rounded-lg p-2 shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
+      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_340px] lg:px-8">
+        <section className="space-y-6">
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-700">Scenario queue</p>
+                <h2 className="mt-1 text-2xl font-bold text-slate-950">Choose today&apos;s HCP simulation</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                  Start with a focused clinical conversation, then review transcript-backed coaching after the session.
+                </p>
+              </div>
+              <button
+                onClick={() => onStartDemo('alex')}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800"
               >
-                <div className="flex items-start">
-                  <div className="text-base mr-2 flex-shrink-0">{benefit.icon}</div>
-                  <div>
-                    <h3 className="text-xs font-semibold text-gray-900 mb-1">{benefit.title}</h3>
-                    <p className="text-xs text-gray-600 leading-tight">{benefit.description}</p>
+                Start Scenario
+                <ArrowRightIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            {scenarioCards.map((scenario, index) => (
+              <motion.article
+                key={scenario.id}
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.08 }}
+                className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="relative h-44 bg-slate-100">
+                  <img
+                    src={scenario.image}
+                    alt={`${scenario.doctorName} avatar preview`}
+                    className="h-full w-full object-cover object-top"
+                  />
+                  <div className="absolute left-3 top-3 rounded-lg bg-slate-950/85 px-3 py-1.5 text-xs font-semibold text-white">
+                    {scenario.doctorName} | {scenario.specialty}
                   </div>
                 </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
 
-        {/* Training Scenarios Section */}
-        <div className="mb-2">
-          <h2 className="text-base font-bold text-gray-900 mb-2 text-center">Choose Your Training Scenario</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            {scenarios.map((scenario, index) => (
-              <motion.div
-                key={scenario.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className={`${scenario.bgColor} rounded-xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl transition-all duration-300 hover:-translate-y-1`}
-              >
-                <div className="p-3">
-                  {/* Header */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="text-2xl">{scenario.avatar}</div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium text-white ${scenario.difficultyColor}`}>
+                <div className="space-y-4 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ${scenario.difficultyStyle}`}>
                       {scenario.difficulty}
                     </span>
+                    <span className="text-xs font-medium text-slate-500">{scenario.metrics.status}</span>
                   </div>
 
-                  {/* Doctor Info */}
-                  <h3 className="text-base font-bold text-gray-900 mb-1">{scenario.doctorName}</h3>
-                  <p className="text-sm text-blue-600 font-medium mb-1">{scenario.specialty}</p>
-                  <p className="text-xs text-gray-600 mb-2">{scenario.description}</p>
-
-                  {/* Scenario Details */}
-                  <div className="space-y-1 mb-3">
-                    <div>
-                      <span className="text-xs font-semibold text-gray-700">Objective:</span>
-                      <p className="text-xs text-gray-600">{scenario.objective}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs font-semibold text-gray-700">Focus Area:</span>
-                      <p className="text-xs text-gray-600">{scenario.focusArea}</p>
-                    </div>
-                    <div>
-                      <span className="text-xs font-semibold text-gray-700">Scenario:</span>
-                      <p className="text-xs text-gray-600">{scenario.scenario}</p>
-                    </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-950">{scenario.trainingGoal}</h3>
+                    <p className="mt-1 text-sm leading-5 text-slate-600">{scenario.challenge}</p>
                   </div>
 
-                  {/* Action Button */}
+                  <dl className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                      <dt className="text-slate-500">Estimated time</dt>
+                      <dd className="inline-flex items-center gap-1 font-semibold text-slate-800">
+                        <ClockIcon className="h-4 w-4 text-slate-400" />
+                        {scenario.time}
+                      </dd>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <dt className="text-slate-500">Last score</dt>
+                      <dd className="font-semibold text-slate-800">{scenario.metrics.score}</dd>
+                    </div>
+                  </dl>
+
                   <button
                     onClick={() => onStartDemo(scenario.id)}
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-3 rounded-lg transition-colors duration-200 flex items-center justify-center text-sm"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 py-2.5 text-sm font-semibold text-white hover:bg-blue-800"
                   >
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.5a1.5 1.5 0 011.5 1.5V12a1.5 1.5 0 01-1.5 1.5H9m8.485-4.243L15.657 7.93A1.5 1.5 0 0014.242 7.5H12a1.5 1.5 0 00-1.5 1.5v2.121m0 0a4 4 0 105.656 0M9 10v2.121" />
-                    </svg>
-                    Start Training with {scenario.doctorName}
+                    {scenario.action}
+                    <ArrowRightIcon className="h-4 w-4" />
                   </button>
                 </div>
-              </motion.div>
+              </motion.article>
             ))}
           </div>
-        </div>
 
-        {/* Bottom CTA Section */}
-        <div className="text-center p-2 bg-blue-50 rounded-lg">
-          <h3 className="text-sm font-bold text-gray-900 mb-1">Ready to Transform Your Field Medical Skills?</h3>
-          <p className="text-xs text-gray-600 mb-1">
-            Experience the future of field medical education. Practice with AI-powered HCPs and build confidence.
-          </p>
-          <div className="flex justify-center space-x-4 text-xs text-gray-500">
-            <span>✓ No API keys required</span>
-            <span>✓ Real-time conversation</span>
-            <span>✓ Instant feedback</span>
-            <span>✓ Performance tracking</span>
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <AcademicCapIcon className="h-6 w-6 text-blue-700" />
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Conversation structure</h2>
+                <p className="text-sm text-slate-600">Every session follows a clear coaching path so learners can recover quickly.</p>
+              </div>
+            </div>
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {workflow.map((step, index) => (
+                <div key={step} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-blue-700 text-xs font-bold text-white">
+                    {index + 1}
+                  </div>
+                  <p className="text-sm font-semibold text-slate-800">{step}</p>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-700">Scenario Builder</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">Generate an ATTR-CM training scenario</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">
+                  Training teams can create targeted simulations for disease education, diagnostic workflows, enrollment barriers, and field skill development.
+                </p>
+              </div>
+              <button
+                onClick={handleGenerateScenario}
+                disabled={isGenerating}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800 disabled:bg-slate-300"
+              >
+                {isGenerating ? 'Generating...' : 'Generate Scenario'}
+                <ArrowRightIcon className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <label className="text-sm font-medium text-slate-700">
+                Learner audience
+                <input
+                  value={builderInput.audience}
+                  onChange={event => updateBuilder('audience', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Difficulty
+                <select
+                  value={builderInput.difficulty}
+                  onChange={event => updateBuilder('difficulty', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                >
+                  <option>Beginner</option>
+                  <option>Intermediate</option>
+                  <option>Advanced</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Training goal
+                <input
+                  value={builderInput.goal}
+                  onChange={event => updateBuilder('goal', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                HCP persona
+                <input
+                  value={builderInput.hcpPersona}
+                  onChange={event => updateBuilder('hcpPersona', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700 md:col-span-2">
+                Clinical focus
+                <textarea
+                  value={builderInput.clinicalFocus}
+                  onChange={event => updateBuilder('clinicalFocus', event.target.value)}
+                  rows={2}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-end">
+                <label className="flex-1 text-sm font-medium text-slate-700">
+                  Venice API key
+                  <input
+                    type="password"
+                    value={apiKeys.venice}
+                    onChange={event => setApiKeys(prev => ({ ...prev, venice: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    placeholder="Used for scenario generation, live nudges, and analysis"
+                  />
+                  {savedKeys.venice && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
+                </label>
+                <label className="flex-1 text-sm font-medium text-slate-700">
+                  HeyGen API key
+                  <input
+                    type="password"
+                    value={apiKeys.heygen}
+                    onChange={event => setApiKeys(prev => ({ ...prev, heygen: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    placeholder="Used for Video Agent storyboard sessions"
+                  />
+                  {savedKeys.heygen && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
+                </label>
+                <button
+                  onClick={saveLocalKeys}
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                >
+                  Save Local Keys
+                </button>
+              </div>
+              <p className="mt-2 text-xs text-slate-500">Keys are stored only in this browser on localhost and are not committed to the repo.</p>
+            </div>
+
+            {builderError && <p className="mt-3 text-sm font-medium text-amber-700">{builderError}</p>}
+            {generatedScenario && (
+              <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Generated scenario ready</p>
+                    <h3 className="mt-1 font-bold text-slate-950">{generatedScenario.title}</h3>
+                    <p className="mt-1 text-sm text-slate-700">{generatedScenario.currentObjective}</p>
+                  </div>
+                  <button
+                    onClick={() => onStartDemo('custom')}
+                    className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                  >
+                    Launch Generated Scenario
+                  </button>
+                </div>
+                <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">HeyGen Video Agent</p>
+                      <h4 className="font-bold text-slate-950">Create a storyboard for training rollout</h4>
+                      <p className="mt-1 text-sm text-slate-600">
+                        Use interactive sessions to review, revise, and approve a short scenario training video.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={handleCreateVideoStoryboard}
+                        className="rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                      >
+                        Create Storyboard
+                      </button>
+                      {videoSession && (
+                        <button
+                          onClick={handlePollVideoStoryboard}
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          Poll Status
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {videoStatus && <p className="mt-3 text-sm font-medium text-slate-700">{videoStatus}</p>}
+                  {videoSession && (
+                    <div className="mt-4 space-y-3">
+                      <div className="grid gap-2 text-sm md:grid-cols-3">
+                        <div className="rounded-md bg-slate-50 p-3">
+                          <span className="block text-xs font-bold uppercase text-slate-500">Session</span>
+                          <span className="break-all font-medium text-slate-800">{videoSession.session_id}</span>
+                        </div>
+                        <div className="rounded-md bg-slate-50 p-3">
+                          <span className="block text-xs font-bold uppercase text-slate-500">Status</span>
+                          <span className="font-medium text-slate-800">{videoSession.status}</span>
+                        </div>
+                        <div className="rounded-md bg-slate-50 p-3">
+                          <span className="block text-xs font-bold uppercase text-slate-500">Video</span>
+                          <span className="font-medium text-slate-800">{videoSession.video_id || 'Not generated yet'}</span>
+                        </div>
+                      </div>
+                      {videoSession.messages?.length ? (
+                        <div className="max-h-44 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
+                          {videoSession.messages.slice(0, 4).map((message, index) => (
+                            <div key={`${message.created_at}-${index}`} className="mb-3 last:mb-0">
+                              <span className="font-bold capitalize text-slate-700">{message.role}: </span>
+                              <span className="text-slate-600">{message.content}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                      <textarea
+                        value={videoFeedback}
+                        onChange={event => setVideoFeedback(event.target.value)}
+                        rows={2}
+                        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                        placeholder="Request a storyboard change or approve it..."
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={() => handleSendVideoFeedback(false)}
+                          className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800"
+                        >
+                          Send Feedback
+                        </button>
+                        <button
+                          onClick={() => handleSendVideoFeedback(true)}
+                          className="rounded-lg bg-red-700 px-3 py-2 text-sm font-semibold text-white hover:bg-red-800"
+                        >
+                          Approve & Generate
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-5">
+              <p className="text-sm font-medium text-blue-700">Why AI training helps</p>
+              <h2 className="mt-1 text-lg font-bold text-slate-950">Benefits for field medical teams</h2>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {benefits.map(({ icon: Icon, title, description }) => (
+                <div key={title} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <Icon className="mb-3 h-6 w-6 text-blue-700" />
+                  <h3 className="text-sm font-bold text-slate-950">{title}</h3>
+                  <p className="mt-1 text-sm leading-5 text-slate-600">{description}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <aside className="space-y-6">
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-950">Recent performance</h2>
+              <ChartBarIcon className="h-5 w-5 text-blue-700" />
+            </div>
+            <div className="mt-4 space-y-4">
+              {recentSessions.map((item) => (
+                <div key={item.label}>
+                  <div className="mb-1 flex items-center justify-between text-sm">
+                    <span className="font-medium text-slate-700">{item.label}</span>
+                    <span className="font-semibold text-slate-950">{item.score}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100">
+                    <div className="h-2 rounded-full bg-blue-700" style={{ width: `${item.score}%` }} />
+                  </div>
+                  <p className="mt-1 text-xs font-medium text-emerald-700">{item.trend}</p>
+                </div>
+              ))}
+            </div>
+            <button className="mt-5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Review Past Sessions
+            </button>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <ShieldCheckIcon className="h-6 w-6 text-emerald-600" />
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Readiness checks</h2>
+                <p className="text-sm text-slate-600">Training console requirements</p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-3 text-sm">
+              {['Camera and microphone test', 'Compliance guardrails active', 'Transcript capture enabled'].map((item) => (
+                <div key={item} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                  <span className="font-medium text-slate-700">{item}</span>
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                    Ready
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+      </main>
     </div>
   );
 };
 
-export default LandingPage; 
+export default LandingPage;
