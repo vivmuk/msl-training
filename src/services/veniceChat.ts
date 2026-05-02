@@ -1,7 +1,7 @@
 const VENICE_CHAT_URL = 'https://api.venice.ai/api/v1/chat/completions';
 
 // Default to a large capable model; override with REACT_APP_VENICE_MODEL
-const DEFAULT_MODEL = process.env.REACT_APP_VENICE_MODEL || 'llama-3.3-70b';
+const DEFAULT_MODEL = process.env.REACT_APP_VENICE_MODEL || 'google-gemma-4-31b-it';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
