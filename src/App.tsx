@@ -1,26 +1,38 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import UserCamera from './components/UserCamera';
 import LandingPage from './components/LandingPage';
+import LiveTranscript from './components/LiveTranscript';
+import PerformanceReview from './components/PerformanceReview';
+import { LiveTranscriptRecorder } from './services/liveTranscript';
+import { TranscriptEntry } from './components/LiveTranscript';
+import AvatarRoom from './components/AvatarRoom';
+import { analyzeSession, SessionAnalysis, AnalysisEntry } from './services/claudeAnalysis';
 import './App.css';
 
-// Scenario data structure
+// Scenario data — avatarName + knowledgeId decoded from HeyGen Labs embed URLs
 const scenarios = {
   alex: {
     doctorName: 'Dr. Alex',
     specialty: 'Cardiologist',
-    description: 'Busy extremely sharp KOL Cardiologist',
+    description: 'Busy, extremely sharp KOL Cardiologist — tafamidis dose comparison',
+    avatarName: 'Dexter_Doctor_Standing2_public',
+    knowledgeId: '2ffddd528baa411d9cdcd972b38d5350',
     heyGenUrl: "https://labs.heygen.com/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJEZXh0ZXJfRG9jdG9yX1N0YW5kaW5nMl9w%0D%0AdWJsaWMiLCJwcmV2aWV3SW1nIjoiaHR0cHM6Ly9maWxlczIuaGV5Z2VuLmFpL2F2YXRhci92My84%0D%0AOGQ0MjFmOTM5MDQ0YmIwOGQ4OTJlODMzOTMxOTQ4Yl80NTU5MC9wcmV2aWV3X3RhbGtfMS53ZWJw%0D%0AIiwibmVlZFJlbW92ZUJhY2tncm91bmQiOmZhbHNlLCJrbm93bGVkZ2VCYXNlSWQiOiIyZmZkZGQ1%0D%0AMjhiYWE0MTFkOWNkY2Q5NzJiMzhkNTM1MCIsInVzZXJuYW1lIjoiNGE2MjIwYWQyNjUwNDFkNWI4%0D%0ANTk2NjZjMDNiY2FmZjcifQ%3D%3D&inIFrame=1"
   },
   ena: {
     doctorName: 'Dr. Ena',
-    specialty: 'General Medicine',
-    description: 'Warm HCP meeting for the first time',
+    specialty: 'Academic Oncologist',
+    description: 'Warm HCP — first meeting, relationship building',
+    avatarName: 'Judy_Doctor_Sitting2_public',
+    knowledgeId: '143ea8a060994ce7a5587465b3018b3b',
     heyGenUrl: "https://labs.heygen.com/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJKdWR5X0RvY3Rvcl9TaXR0aW5nMl9wdWJs%0D%0AaWMiLCJwcmV2aWV3SW1nIjoiaHR0cHM6Ly9maWxlczIuaGV5Z2VuLmFpL2F2YXRhci92My8wMjJj%0D%0AZGIxZjA3OTE0ZTc1ODg3YzY5M2YwYzVmOTdkZF80NTY1MC9wcmV2aWV3X3RhbGtfMS53ZWJwIiwi%0D%0AbmVlZFJlbW92ZUJhY2tncm91bmQiOmZhbHNlLCJrbm93bGVkZ2VCYXNlSWQiOiIxNDNlYThhMDYw%0D%0AOTk0Y2U3YTU1ODc0NjViMzAxOGIzYiIsInVzZXJuYW1lIjoiNGE2MjIwYWQyNjUwNDFkNWI4NTk2%0D%0ANjZjMDNiY2FmZjcifQ%3D%3D&inIFrame=1"
   },
   dat: {
     doctorName: 'Dr. Dat',
     specialty: 'Clinical Research',
     description: 'Clinical Trial PI with enrollment challenges',
+    avatarName: 'Bryan_IT_Sitting_public',
+    knowledgeId: '94779ada29094de08f6cc68d0365834c',
     heyGenUrl: "https://labs.heygen.com/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJCcnlhbl9JVF9TaXR0aW5nX3B1YmxpYyIs%0D%0AInByZXZpZXdJbWciOiJodHRwczovL2ZpbGVzMi5oZXlnZW4uYWkvYXZhdGFyL3YzLzMzYzlhYzRh%0D%0AZWFkNDRkZmM4YmMwMDgyYTM1MDYyYTcwXzQ1NTgwL3ByZXZpZXdfdGFsa18zLndlYnAiLCJuZWVk%0D%0AUmVtb3ZlQmFja2dyb3VuZCI6ZmFsc2UsImtub3dsZWRnZUJhc2VJZCI6Ijk0Nzc5YWRhMjkwOTRk%0D%0AZTA4ZjZjYzY4ZDAzNjU4MzRjIiwidXNlcm5hbWUiOiI0YTYyMjBhZDI2NTA0MWQ1Yjg1OTY2NmMw%0D%0AM2JjYWZmNyJ9&inIFrame=1"
   }
 };
@@ -32,6 +44,14 @@ const App: React.FC = () => {
   const [heyGenError, setHeyGenError] = useState(false);
   const [userCameraReady, setUserCameraReady] = useState(false);
   const [showHeyGenIframe, setShowHeyGenIframe] = useState(false);
+
+  // Transcript + analysis state
+  const [transcriptEntries, setTranscriptEntries] = useState<TranscriptEntry[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [sessionAnalysis, setSessionAnalysis] = useState<SessionAnalysis | null>(null);
+  const [sessionStartTime, setSessionStartTime] = useState(0);
+  const recorderRef = useRef<LiveTranscriptRecorder | null>(null);
 
   const currentScenario = scenarios[selectedScenario as keyof typeof scenarios];
 
@@ -82,8 +102,28 @@ const App: React.FC = () => {
     };
   }, [currentPage, isHeyGenReady, selectedScenario]);
 
-  const handleUserCameraReady = () => {
+  const handleUserCameraReady = (stream: MediaStream) => {
     setUserCameraReady(true);
+
+    const veniceKey = process.env.REACT_APP_VENICE_API_KEY;
+    if (!veniceKey) return;
+
+    const recorder = new LiveTranscriptRecorder(veniceKey, (entry: TranscriptEntry) => {
+      setTranscriptEntries(prev => {
+        const idx = prev.findIndex(e => e.id === entry.id);
+        if (idx >= 0) {
+          if (!entry.text) return prev.filter(e => e.id !== entry.id);
+          const next = [...prev];
+          next[idx] = entry;
+          return next;
+        }
+        if (!entry.text) return prev;
+        return [...prev, entry];
+      });
+    });
+    recorder.start(stream);
+    recorderRef.current = recorder;
+    setIsRecording(true);
   };
 
   const handleUserCameraError = (error: Error) => {
@@ -92,12 +132,73 @@ const App: React.FC = () => {
 
   const handleStartDemo = (scenarioId: string) => {
     setSelectedScenario(scenarioId);
+    setTranscriptEntries([]);
+    setSessionAnalysis(null);
+    setSessionStartTime(Date.now());
     setCurrentPage('training');
   };
 
   const handleBackToLanding = () => {
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    setIsRecording(false);
     setCurrentPage('landing');
     setSelectedScenario('alex');
+    setTranscriptEntries([]);
+    setSessionAnalysis(null);
+  };
+
+  // Called by AvatarRoom (SDK mode) — receives full dual-track transcript
+  const handleAvatarRoomEnd = async (entries: AnalysisEntry[], duration: number) => {
+    setSessionStartTime(Date.now() - duration * 1000);
+    setIsAnalyzing(true);
+    setCurrentPage('review');
+
+    const veniceKey = process.env.REACT_APP_VENICE_API_KEY;
+    if (veniceKey) {
+      try {
+        const scenario = scenarios[selectedScenario as keyof typeof scenarios];
+        const analysis = await analyzeSession(
+          entries,
+          { doctorName: scenario.doctorName, specialty: scenario.specialty, focusArea: scenario.description },
+          veniceKey,
+        );
+        setSessionAnalysis(analysis);
+      } catch (err) {
+        console.error('SDK session analysis failed:', err);
+      }
+    }
+    setIsAnalyzing(false);
+  };
+
+  // Called by iframe fallback mode — uses Venice STT transcript (user side only)
+  const handleEndSession = async () => {
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    setIsRecording(false);
+
+    const veniceKey = process.env.REACT_APP_VENICE_API_KEY;
+    if (veniceKey) {
+      setIsAnalyzing(true);
+      try {
+        const scenario = scenarios[selectedScenario as keyof typeof scenarios];
+        const iframeEntries: AnalysisEntry[] = transcriptEntries
+          .filter(e => !e.pending && e.text)
+          .map(e => ({ speaker: 'msl' as const, text: e.text, timestamp: e.timestamp }));
+        const analysis = await analyzeSession(
+          iframeEntries,
+          { doctorName: scenario.doctorName, specialty: scenario.specialty, focusArea: scenario.description },
+          veniceKey,
+        );
+        setSessionAnalysis(analysis);
+      } catch (err) {
+        console.error('Iframe session analysis failed:', err);
+      } finally {
+        setIsAnalyzing(false);
+      }
+    }
+
+    setCurrentPage('review');
   };
 
   const retryHeyGenLoad = () => {
@@ -260,7 +361,36 @@ const App: React.FC = () => {
     return <LandingPage onStartDemo={handleStartDemo} />;
   }
 
+  if (currentPage === 'review') {
+    const scenario = scenarios[selectedScenario as keyof typeof scenarios];
+    return (
+      <PerformanceReview
+        onReturnHome={handleBackToLanding}
+        duration={Math.floor((Date.now() - sessionStartTime) / 1000)}
+        scenario={{ doctorName: scenario.doctorName, specialty: scenario.specialty }}
+        analysis={isAnalyzing ? null : sessionAnalysis}
+      />
+    );
+  }
+
   const trainingScript = getTrainingScript();
+
+  // ── SDK mode: HeyGen Streaming Avatar with full duplex transcript ─────────
+  const heygenApiKey = process.env.REACT_APP_HEYGEN_API_KEY;
+  if (currentPage === 'training' && heygenApiKey) {
+    const scenario = scenarios[selectedScenario as keyof typeof scenarios];
+    return (
+      <AvatarRoom
+        scenario={scenario}
+        scriptTitle={trainingScript.title}
+        scriptSections={trainingScript.sections}
+        heygenApiKey={heygenApiKey}
+        onEnd={handleAvatarRoomEnd}
+        onBack={handleBackToLanding}
+      />
+    );
+  }
+  // ── Fallback: iframe embed + Venice STT (no HEYGEN_API_KEY needed) ────────
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-medical-50 to-primary-50 p-4">
@@ -280,7 +410,23 @@ const App: React.FC = () => {
                 </span>
               </div>
             </div>
-            <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-3">
+              {isAnalyzing ? (
+                <div className="flex items-center text-blue-600 text-sm font-medium">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2" />
+                  Analyzing session…
+                </div>
+              ) : (
+                <button
+                  onClick={handleEndSession}
+                  className="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center space-x-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                  </svg>
+                  <span>End &amp; Analyze</span>
+                </button>
+              )}
               <button
                 onClick={handleBackToLanding}
                 className="bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
@@ -392,6 +538,11 @@ const App: React.FC = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Live Transcript */}
+        <div className="mb-6">
+          <LiveTranscript entries={transcriptEntries} isRecording={isRecording} />
         </div>
 
         {/* How to Use Guide */}
