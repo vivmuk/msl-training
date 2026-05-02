@@ -1,4 +1,10 @@
-import { TranscriptEntry } from './liveTranscript';
+import { veniceChat } from './veniceChat';
+
+export interface AnalysisEntry {
+  speaker: 'msl' | 'hcp';
+  text: string;
+  timestamp: number;
+}
 
 export interface SkillScore {
   name: string;
@@ -29,47 +35,52 @@ export const MSL_SKILLS = [
 ] as const;
 
 export async function analyzeSession(
-  entries: TranscriptEntry[],
+  entries: AnalysisEntry[],
   scenario: { doctorName: string; specialty: string; focusArea: string },
   apiKey: string,
 ): Promise<SessionAnalysis> {
+  // Format transcript with both speakers so the model has full context
   const lines = entries
-    .filter(e => !e.pending && e.text && e.text !== '...')
-    .map(e => `[MSL]: ${e.text}`)
+    .filter(e => e.text.trim())
+    .map(e => {
+      const label = e.speaker === 'msl' ? '[MSL]' : `[${scenario.doctorName}]`;
+      return `${label}: ${e.text.trim()}`;
+    })
     .join('\n');
 
-  const transcript = lines.trim()
-    || '(No transcript was captured — ensure a Venice API key is set and microphone access was granted)';
+  const transcript = lines || '(No transcript captured — ensure API keys are configured and microphone access was granted)';
 
-  const userPrompt = `Evaluate this MSL (Medical Science Liaison) training session.
+  const system = `You are an expert MSL (Medical Science Liaison) coach providing specific, evidence-based feedback grounded in the actual conversation transcript. Be constructive and precise.`;
+
+  const user = `Evaluate this MSL training session.
 
 **Scenario:** Practice with ${scenario.doctorName} (${scenario.specialty})
 **Focus area:** ${scenario.focusArea}
 
-**Transcript — MSL speech only (voice-captured):**
+**Full conversation transcript:**
 ${transcript}
 
-Score the MSL on all 10 competency dimensions (0–100 each):
+Score the MSL on these 10 competency dimensions (0–100 each):
 ${MSL_SKILLS.map((s, i) => `${i + 1}. ${s}`).join('\n')}
 
 Scoring guide: 90–100 Expert · 75–89 Proficient · 60–74 Developing · <60 Needs work
 
-If the transcript is empty or very short, acknowledge that and give constructive guidance on what to practise.
+If the transcript is empty or very short, note that and provide guidance on what to practise.
 
-Respond with ONLY a valid JSON object — no markdown fences, no text outside the braces:
+Respond with ONLY a valid JSON object — no markdown fences, no surrounding text:
 {
   "overallScore": <weighted 0-100>,
-  "summary": "<2-3 sentence executive summary>",
+  "summary": "<2-3 sentence executive summary referencing the actual conversation>",
   "skills": [
-    {"name": "<exact skill name from the list>", "score": <0-100>, "feedback": "<1-2 specific sentences, reference transcript where possible>"}
+    {"name": "<exact skill name>", "score": <0-100>, "feedback": "<1-2 specific sentences, quote transcript where possible>"}
   ],
   "strengths": [
-    {"title": "<3-5 word title>", "description": "<specific observation>"},
-    {"title": "<3-5 word title>", "description": "<specific observation>"}
+    {"title": "<3-5 word title>", "description": "<specific observation from transcript>"},
+    {"title": "<3-5 word title>", "description": "<specific observation from transcript>"}
   ],
   "improvements": [
-    {"title": "<3-5 word title>", "description": "<actionable coaching tip>"},
-    {"title": "<3-5 word title>", "description": "<actionable coaching tip>"}
+    {"title": "<3-5 word title>", "description": "<actionable coaching tip with example phrasing>"},
+    {"title": "<3-5 word title>", "description": "<actionable coaching tip with example phrasing>"}
   ],
   "nextSteps": [
     "<concrete action item 1>",
@@ -78,32 +89,13 @@ Respond with ONLY a valid JSON object — no markdown fences, no text outside th
   ]
 }`;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 2048,
-      system: 'You are an expert MSL coach. Give specific, constructive, evidence-based feedback grounded in the transcript provided.',
-      messages: [{ role: 'user', content: userPrompt }],
-    }),
-  });
-
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new Error(`Claude API ${res.status}: ${detail}`);
-  }
-
-  const data = await res.json();
-  const raw: string = data.content?.[0]?.text ?? '';
+  const raw = await veniceChat(
+    [{ role: 'system', content: system }, { role: 'user', content: user }],
+    apiKey,
+  );
 
   const match = raw.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error('Could not extract JSON from Claude response');
+  if (!match) throw new Error('Could not extract JSON from Venice response');
 
   return JSON.parse(match[0]) as SessionAnalysis;
 }

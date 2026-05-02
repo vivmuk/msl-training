@@ -1,12 +1,24 @@
 import React, { useEffect, useRef } from 'react';
-import { TranscriptEntry } from '../services/liveTranscript';
+
+export interface TranscriptEntry {
+  id: string;
+  text: string;
+  timestamp: number;
+  pending?: boolean;
+  speaker?: 'msl' | 'hcp'; // undefined → 'msl' (backward compat with Venice STT flow)
+}
 
 interface LiveTranscriptProps {
   entries: TranscriptEntry[];
   isRecording: boolean;
+  doctorName?: string;
 }
 
-const LiveTranscript: React.FC<LiveTranscriptProps> = ({ entries, isRecording }) => {
+const LiveTranscript: React.FC<LiveTranscriptProps> = ({
+  entries,
+  isRecording,
+  doctorName = 'Doctor',
+}) => {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,9 +39,9 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ entries, isRecording })
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <h3 className="text-sm font-semibold text-gray-700">Live Transcript</h3>
-          <span className="text-xs text-gray-400">
-            {!isRecording && '— add REACT_APP_VENICE_API_KEY to enable'}
-          </span>
+          {!isRecording && (
+            <span className="text-xs text-gray-400">— add API keys to enable</span>
+          )}
         </div>
 
         {isRecording && (
@@ -44,19 +56,26 @@ const LiveTranscript: React.FC<LiveTranscriptProps> = ({ entries, isRecording })
         {visible.length === 0 ? (
           <p className="text-gray-400 italic text-center mt-6">
             {isRecording
-              ? 'Start speaking — your words will appear here every ~5 s'
-              : 'Transcript will appear once recording starts'}
+              ? 'Start speaking — transcript appears every few seconds'
+              : 'Transcript will appear once the session starts'}
           </p>
         ) : (
-          visible.map(entry => (
-            <div key={entry.id} className="flex items-start space-x-2">
-              <span className="text-gray-400 flex-shrink-0 tabular-nums">{fmt(entry.timestamp)}</span>
-              <span className={entry.pending ? 'text-gray-400 italic animate-pulse' : 'text-gray-800'}>
-                <span className="font-semibold text-blue-600 not-italic">You: </span>
-                {entry.text}
-              </span>
-            </div>
-          ))
+          visible.map(entry => {
+            const speaker = entry.speaker ?? 'msl';
+            return (
+              <div key={entry.id} className="flex items-start space-x-2">
+                <span className="text-gray-400 flex-shrink-0 tabular-nums">{fmt(entry.timestamp)}</span>
+                <span className={entry.pending ? 'text-gray-400 italic animate-pulse' : 'text-gray-800'}>
+                  <span className={`font-semibold not-italic mr-1 ${
+                    speaker === 'hcp' ? 'text-green-600' : 'text-blue-600'
+                  }`}>
+                    {speaker === 'hcp' ? `${doctorName}:` : 'You:'}
+                  </span>
+                  {entry.text}
+                </span>
+              </div>
+            );
+          })
         )}
         <div ref={bottomRef} />
       </div>

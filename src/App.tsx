@@ -3,28 +3,36 @@ import UserCamera from './components/UserCamera';
 import LandingPage from './components/LandingPage';
 import LiveTranscript from './components/LiveTranscript';
 import PerformanceReview from './components/PerformanceReview';
-import { LiveTranscriptRecorder, TranscriptEntry } from './services/liveTranscript';
-import { analyzeSession, SessionAnalysis } from './services/claudeAnalysis';
+import { LiveTranscriptRecorder } from './services/liveTranscript';
+import { TranscriptEntry } from './components/LiveTranscript';
+import AvatarRoom from './components/AvatarRoom';
+import { analyzeSession, SessionAnalysis, AnalysisEntry } from './services/claudeAnalysis';
 import './App.css';
 
-// Scenario data structure
+// Scenario data — avatarName + knowledgeId decoded from HeyGen Labs embed URLs
 const scenarios = {
   alex: {
     doctorName: 'Dr. Alex',
     specialty: 'Cardiologist',
-    description: 'Busy extremely sharp KOL Cardiologist',
+    description: 'Busy, extremely sharp KOL Cardiologist — tafamidis dose comparison',
+    avatarName: 'Dexter_Doctor_Standing2_public',
+    knowledgeId: '2ffddd528baa411d9cdcd972b38d5350',
     heyGenUrl: "https://labs.heygen.com/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJEZXh0ZXJfRG9jdG9yX1N0YW5kaW5nMl9w%0D%0AdWJsaWMiLCJwcmV2aWV3SW1nIjoiaHR0cHM6Ly9maWxlczIuaGV5Z2VuLmFpL2F2YXRhci92My84%0D%0AOGQ0MjFmOTM5MDQ0YmIwOGQ4OTJlODMzOTMxOTQ4Yl80NTU5MC9wcmV2aWV3X3RhbGtfMS53ZWJw%0D%0AIiwibmVlZFJlbW92ZUJhY2tncm91bmQiOmZhbHNlLCJrbm93bGVkZ2VCYXNlSWQiOiIyZmZkZGQ1%0D%0AMjhiYWE0MTFkOWNkY2Q5NzJiMzhkNTM1MCIsInVzZXJuYW1lIjoiNGE2MjIwYWQyNjUwNDFkNWI4%0D%0ANTk2NjZjMDNiY2FmZjcifQ%3D%3D&inIFrame=1"
   },
   ena: {
     doctorName: 'Dr. Ena',
-    specialty: 'General Medicine',
-    description: 'Warm HCP meeting for the first time',
+    specialty: 'Academic Oncologist',
+    description: 'Warm HCP — first meeting, relationship building',
+    avatarName: 'Judy_Doctor_Sitting2_public',
+    knowledgeId: '143ea8a060994ce7a5587465b3018b3b',
     heyGenUrl: "https://labs.heygen.com/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJKdWR5X0RvY3Rvcl9TaXR0aW5nMl9wdWJs%0D%0AaWMiLCJwcmV2aWV3SW1nIjoiaHR0cHM6Ly9maWxlczIuaGV5Z2VuLmFpL2F2YXRhci92My8wMjJj%0D%0AZGIxZjA3OTE0ZTc1ODg3YzY5M2YwYzVmOTdkZF80NTY1MC9wcmV2aWV3X3RhbGtfMS53ZWJwIiwi%0D%0AbmVlZFJlbW92ZUJhY2tncm91bmQiOmZhbHNlLCJrbm93bGVkZ2VCYXNlSWQiOiIxNDNlYThhMDYw%0D%0AOTk0Y2U3YTU1ODc0NjViMzAxOGIzYiIsInVzZXJuYW1lIjoiNGE2MjIwYWQyNjUwNDFkNWI4NTk2%0D%0ANjZjMDNiY2FmZjcifQ%3D%3D&inIFrame=1"
   },
   dat: {
     doctorName: 'Dr. Dat',
     specialty: 'Clinical Research',
     description: 'Clinical Trial PI with enrollment challenges',
+    avatarName: 'Bryan_IT_Sitting_public',
+    knowledgeId: '94779ada29094de08f6cc68d0365834c',
     heyGenUrl: "https://labs.heygen.com/guest/streaming-embed?share=eyJxdWFsaXR5IjoiaGlnaCIsImF2YXRhck5hbWUiOiJCcnlhbl9JVF9TaXR0aW5nX3B1YmxpYyIs%0D%0AInByZXZpZXdJbWciOiJodHRwczovL2ZpbGVzMi5oZXlnZW4uYWkvYXZhdGFyL3YzLzMzYzlhYzRh%0D%0AZWFkNDRkZmM4YmMwMDgyYTM1MDYyYTcwXzQ1NTgwL3ByZXZpZXdfdGFsa18zLndlYnAiLCJuZWVk%0D%0AUmVtb3ZlQmFja2dyb3VuZCI6ZmFsc2UsImtub3dsZWRnZUJhc2VJZCI6Ijk0Nzc5YWRhMjkwOTRk%0D%0AZTA4ZjZjYzY4ZDAzNjU4MzRjIiwidXNlcm5hbWUiOiI0YTYyMjBhZDI2NTA0MWQ1Yjg1OTY2NmMw%0D%0AM2JjYWZmNyJ9&inIFrame=1"
   }
 };
@@ -140,24 +148,51 @@ const App: React.FC = () => {
     setSessionAnalysis(null);
   };
 
+  // Called by AvatarRoom (SDK mode) — receives full dual-track transcript
+  const handleAvatarRoomEnd = async (entries: AnalysisEntry[], duration: number) => {
+    setSessionStartTime(Date.now() - duration * 1000);
+    setIsAnalyzing(true);
+    setCurrentPage('review');
+
+    const veniceKey = process.env.REACT_APP_VENICE_API_KEY;
+    if (veniceKey) {
+      try {
+        const scenario = scenarios[selectedScenario as keyof typeof scenarios];
+        const analysis = await analyzeSession(
+          entries,
+          { doctorName: scenario.doctorName, specialty: scenario.specialty, focusArea: scenario.description },
+          veniceKey,
+        );
+        setSessionAnalysis(analysis);
+      } catch (err) {
+        console.error('SDK session analysis failed:', err);
+      }
+    }
+    setIsAnalyzing(false);
+  };
+
+  // Called by iframe fallback mode — uses Venice STT transcript (user side only)
   const handleEndSession = async () => {
     recorderRef.current?.stop();
     recorderRef.current = null;
     setIsRecording(false);
 
-    const anthropicKey = process.env.REACT_APP_ANTHROPIC_API_KEY;
-    if (anthropicKey) {
+    const veniceKey = process.env.REACT_APP_VENICE_API_KEY;
+    if (veniceKey) {
       setIsAnalyzing(true);
       try {
         const scenario = scenarios[selectedScenario as keyof typeof scenarios];
+        const iframeEntries: AnalysisEntry[] = transcriptEntries
+          .filter(e => !e.pending && e.text)
+          .map(e => ({ speaker: 'msl' as const, text: e.text, timestamp: e.timestamp }));
         const analysis = await analyzeSession(
-          transcriptEntries,
+          iframeEntries,
           { doctorName: scenario.doctorName, specialty: scenario.specialty, focusArea: scenario.description },
-          anthropicKey,
+          veniceKey,
         );
         setSessionAnalysis(analysis);
       } catch (err) {
-        console.error('Session analysis failed:', err);
+        console.error('Iframe session analysis failed:', err);
       } finally {
         setIsAnalyzing(false);
       }
@@ -333,12 +368,29 @@ const App: React.FC = () => {
         onReturnHome={handleBackToLanding}
         duration={Math.floor((Date.now() - sessionStartTime) / 1000)}
         scenario={{ doctorName: scenario.doctorName, specialty: scenario.specialty }}
-        analysis={sessionAnalysis}
+        analysis={isAnalyzing ? null : sessionAnalysis}
       />
     );
   }
 
   const trainingScript = getTrainingScript();
+
+  // ── SDK mode: HeyGen Streaming Avatar with full duplex transcript ─────────
+  const heygenApiKey = process.env.REACT_APP_HEYGEN_API_KEY;
+  if (currentPage === 'training' && heygenApiKey) {
+    const scenario = scenarios[selectedScenario as keyof typeof scenarios];
+    return (
+      <AvatarRoom
+        scenario={scenario}
+        scriptTitle={trainingScript.title}
+        scriptSections={trainingScript.sections}
+        heygenApiKey={heygenApiKey}
+        onEnd={handleAvatarRoomEnd}
+        onBack={handleBackToLanding}
+      />
+    );
+  }
+  // ── Fallback: iframe embed + Venice STT (no HEYGEN_API_KEY needed) ────────
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-medical-50 to-primary-50 p-4">
