@@ -253,7 +253,7 @@ const AvatarRoom: React.FC<AvatarRoomProps> = ({
       window.localStorage.getItem('VENICE_API_KEY') ||
       window.localStorage.getItem('REACT_APP_VENICE_API_KEY') ||
       '';
-    if (!apiKey || analysisEntries.length < 2) return;
+    if (analysisEntries.length < 2) return;
 
     const timeout = window.setTimeout(async () => {
       try {

@@ -43,7 +43,7 @@ async function parseApiResponse(res, label) {
   return json.data ?? json;
 }
 
-async function veniceJson(messages, maxTokens = 2400) {
+async function veniceCompletion(messages, options = {}) {
   const apiKey = process.env.VENICE_API_KEY || process.env.REACT_APP_VENICE_API_KEY;
   if (!apiKey) throw new Error('VENICE_API_KEY is not configured in Netlify.');
 
@@ -55,10 +55,10 @@ async function veniceJson(messages, maxTokens = 2400) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: process.env.VENICE_MODEL || 'google-gemma-4-31b-it',
+        model: options.model || process.env.VENICE_MODEL || 'google-gemma-4-31b-it',
         messages,
-        max_tokens: maxTokens,
-        temperature: 0.25,
+        max_tokens: options.maxTokens || 2048,
+        temperature: options.temperature ?? 0.25,
       }),
     }),
     'Venice chat',
@@ -66,6 +66,11 @@ async function veniceJson(messages, maxTokens = 2400) {
 
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('Empty Venice response');
+  return content;
+}
+
+async function veniceJson(messages, maxTokens = 2400) {
+  const content = await veniceCompletion(messages, { maxTokens, temperature: 0.25 });
   const match = content.match(/\{[\s\S]*\}/);
   if (!match) throw new Error('Could not extract JSON from Venice response');
   return JSON.parse(match[0]);
@@ -228,6 +233,10 @@ exports.handler = async (event) => {
     }
     if (body.action === 'generateScenario') {
       return response(200, { scenario: await generateScenario(body.input || {}) });
+    }
+    if (body.action === 'veniceChat') {
+      const content = await veniceCompletion(body.messages || [], body.options || {});
+      return response(200, { content });
     }
     if (body.action === 'createContext') {
       return response(200, await createContext(body.draft || {}));

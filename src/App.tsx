@@ -257,7 +257,7 @@ const App: React.FC = () => {
     setLiveNudges(fallbackNudges);
 
     const apiKey = getVeniceKey();
-    if (!apiKey || analysisEntries.length < 2) return;
+    if (analysisEntries.length < 2) return;
 
     const timeout = window.setTimeout(async () => {
       try {
@@ -309,12 +309,6 @@ const App: React.FC = () => {
       specialty: currentScenario.specialty,
       focusArea: currentScenario.description,
     };
-    if (!veniceKey) {
-      setIsAnalyzing(false);
-      setSessionAnalysis(buildLocalSessionAnalysis(entries, scenarioForAnalysis));
-      setAnalysisError('No Venice API key is saved. Showing local transcript analysis. Add a Venice key for online AI scoring.');
-      return;
-    }
     setIsAnalyzing(true);
     setAnalysisError('');
     try {
@@ -425,7 +419,7 @@ const App: React.FC = () => {
         analysis={isAnalyzing ? null : sessionAnalysis}
         isAnalyzing={isAnalyzing}
         analysisError={analysisError}
-        hasAnalysisKey={Boolean(getVeniceKey())}
+        hasAnalysisKey={Boolean(getVeniceKey()) || !isLocalHost}
         hasTranscript={reviewEntries.length > 0}
         onGenerateAnalysis={handleGenerateReviewAnalysis}
       />

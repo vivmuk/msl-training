@@ -26,10 +26,10 @@ LIVEAVATAR_CUSTOM_AVATAR_ID=...
 AI coaching and scenario generation use Venice:
 
 ```env
-REACT_APP_VENICE_API_KEY=your_venice_key
+VENICE_API_KEY=your_venice_key
 ```
 
-For local development only, you can still set `REACT_APP_LIVEAVATAR_API_KEY`, `REACT_APP_LIVEAVATAR_AVATAR_ID`, `REACT_APP_VENICE_API_KEY`, and `REACT_APP_HEYGEN_API_KEY` in `.env`. `REACT_APP_HEYGEN_API_KEY` is only used for HeyGen Video Agent storyboard sessions, not the live HCP avatar room.
+For local development only, you can still set `REACT_APP_LIVEAVATAR_API_KEY`, `REACT_APP_LIVEAVATAR_AVATAR_ID`, `REACT_APP_VENICE_API_KEY`, and `REACT_APP_HEYGEN_API_KEY` in `.env`. Production should use server-side `LIVEAVATAR_API_KEY` and `VENICE_API_KEY`; `REACT_APP_HEYGEN_API_KEY` is only used for HeyGen Video Agent storyboard sessions, not the live HCP avatar room.
 
 LiveAvatar IDs:
 - Avatar IDs come from `app.liveavatar.com` or from the dashboard Persona Studio "Load IDs" action, which calls `GET /v1/avatars` through Netlify.
