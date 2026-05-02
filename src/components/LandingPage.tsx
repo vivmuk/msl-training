@@ -25,6 +25,7 @@ interface LandingPageProps {
   onStartDemo: (scenario: string) => void;
   onScenarioCreated?: (scenario: TrainingScenarioDraft) => void;
   generatedScenario?: TrainingScenarioDraft | null;
+  onLocalSettingsSaved?: () => void;
 }
 
 const scenarios = [
@@ -113,7 +114,7 @@ const benefits = [
   },
 ];
 
-const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreated, generatedScenario }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreated, generatedScenario, onLocalSettingsSaved }) => {
   const [builderInput, setBuilderInput] = useState({
     audience: 'New MSLs preparing for cardiology field visits',
     difficulty: 'Intermediate',
@@ -126,9 +127,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
   const [videoSession, setVideoSession] = useState<HeyGenAgentSession | null>(null);
   const [videoFeedback, setVideoFeedback] = useState('');
   const [videoStatus, setVideoStatus] = useState('');
-  const [apiKeys, setApiKeys] = useState({ venice: '', heygen: '' });
+  const [apiKeys, setApiKeys] = useState({ venice: '', liveavatar: '', liveavatarAvatarId: '', heygen: '' });
   const [savedKeys, setSavedKeys] = useState(() => ({
     venice: Boolean(window.localStorage.getItem('VENICE_API_KEY')),
+    liveavatar: Boolean(window.localStorage.getItem('LIVEAVATAR_API_KEY')),
+    liveavatarAvatarId: Boolean(window.localStorage.getItem('LIVEAVATAR_AVATAR_ID')),
     heygen: Boolean(window.localStorage.getItem('HEYGEN_API_KEY')),
   }));
 
@@ -199,13 +202,18 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
 
   const saveLocalKeys = () => {
     if (apiKeys.venice) window.localStorage.setItem('VENICE_API_KEY', apiKeys.venice);
+    if (apiKeys.liveavatar) window.localStorage.setItem('LIVEAVATAR_API_KEY', apiKeys.liveavatar);
+    if (apiKeys.liveavatarAvatarId) window.localStorage.setItem('LIVEAVATAR_AVATAR_ID', apiKeys.liveavatarAvatarId);
     if (apiKeys.heygen) window.localStorage.setItem('HEYGEN_API_KEY', apiKeys.heygen);
     setSavedKeys({
       venice: Boolean(apiKeys.venice || window.localStorage.getItem('VENICE_API_KEY')),
+      liveavatar: Boolean(apiKeys.liveavatar || window.localStorage.getItem('LIVEAVATAR_API_KEY')),
+      liveavatarAvatarId: Boolean(apiKeys.liveavatarAvatarId || window.localStorage.getItem('LIVEAVATAR_AVATAR_ID')),
       heygen: Boolean(apiKeys.heygen || window.localStorage.getItem('HEYGEN_API_KEY')),
     });
-    setApiKeys({ venice: '', heygen: '' });
+    setApiKeys({ venice: '', liveavatar: '', liveavatarAvatarId: '', heygen: '' });
     setBuilderError('Local API settings saved in this browser only.');
+    onLocalSettingsSaved?.();
   };
 
   const handleCreateVideoStoryboard = async () => {
@@ -446,8 +454,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
             </div>
 
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-end">
-                <label className="flex-1 text-sm font-medium text-slate-700">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label className="text-sm font-medium text-slate-700">
                   Venice API key
                   <input
                     type="password"
@@ -458,8 +466,29 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
                   />
                   {savedKeys.venice && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
                 </label>
-                <label className="flex-1 text-sm font-medium text-slate-700">
-                  HeyGen API key
+                <label className="text-sm font-medium text-slate-700">
+                  LiveAvatar API key
+                  <input
+                    type="password"
+                    value={apiKeys.liveavatar}
+                    onChange={event => setApiKeys(prev => ({ ...prev, liveavatar: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    placeholder="Used for real-time HCP avatar sessions"
+                  />
+                  {savedKeys.liveavatar && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  LiveAvatar avatar ID
+                  <input
+                    value={apiKeys.liveavatarAvatarId}
+                    onChange={event => setApiKeys(prev => ({ ...prev, liveavatarAvatarId: event.target.value }))}
+                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                    placeholder="Default avatar ID for local testing"
+                  />
+                  {savedKeys.liveavatarAvatarId && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
+                </label>
+                <label className="text-sm font-medium text-slate-700">
+                  HeyGen Video Agent key
                   <input
                     type="password"
                     value={apiKeys.heygen}
@@ -469,6 +498,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
                   />
                   {savedKeys.heygen && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
                 </label>
+              </div>
+              <div className="mt-3 flex justify-end">
                 <button
                   onClick={saveLocalKeys}
                   className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
@@ -476,7 +507,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
                   Save Local Keys
                 </button>
               </div>
-              <p className="mt-2 text-xs text-slate-500">Keys are stored only in this browser on localhost and are not committed to the repo.</p>
+              <p className="mt-2 text-xs text-slate-500">Keys are stored only in this browser and are not committed to the repo.</p>
             </div>
 
             {builderError && <p className="mt-3 text-sm font-medium text-amber-700">{builderError}</p>}

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import UserCamera from './components/UserCamera';
 import LandingPage from './components/LandingPage';
 import PerformanceReview from './components/PerformanceReview';
@@ -9,6 +9,7 @@ import { LiveTranscriptRecorder } from './services/liveTranscript';
 import { analyzeSession, AnalysisEntry, buildLocalSessionAnalysis, SessionAnalysis } from './services/claudeAnalysis';
 import { TrainingScenarioDraft } from './services/scenarioGenerator';
 import { buildLocalLiveFeedback, DEFAULT_LIVE_NUDGES, generateLiveFeedback, LiveFeedbackNudge } from './services/liveFeedback';
+import { LiveAvatarConfig } from './services/liveAvatar';
 import './App.css';
 
 const scenarios = {
@@ -153,6 +154,7 @@ const App: React.FC = () => {
   const [liveNudges, setLiveNudges] = useState<LiveFeedbackNudge[]>(DEFAULT_LIVE_NUDGES);
   const [reviewEntries, setReviewEntries] = useState<AnalysisEntry[]>([]);
   const [analysisError, setAnalysisError] = useState('');
+  const [settingsRevision, setSettingsRevision] = useState(0);
   const recorderRef = useRef<LiveTranscriptRecorder | null>(null);
 
   const currentScenario =
@@ -203,10 +205,10 @@ const App: React.FC = () => {
     window.localStorage.getItem('REACT_APP_VENICE_API_KEY') ||
     '';
 
-  const getHeyGenKey = () =>
-    process.env.REACT_APP_HEYGEN_API_KEY ||
-    window.localStorage.getItem('HEYGEN_API_KEY') ||
-    window.localStorage.getItem('REACT_APP_HEYGEN_API_KEY') ||
+  const getLiveAvatarKey = () =>
+    process.env.REACT_APP_LIVEAVATAR_API_KEY ||
+    window.localStorage.getItem('LIVEAVATAR_API_KEY') ||
+    window.localStorage.getItem('REACT_APP_LIVEAVATAR_API_KEY') ||
     '';
 
   const handleUserCameraReady = (stream: MediaStream) => {
@@ -368,12 +370,48 @@ const App: React.FC = () => {
     ]);
   };
 
+  const liveAvatarScenarioKey = selectedScenario === 'custom' ? 'custom' : selectedScenario;
+  const liveAvatarConfig = useMemo<LiveAvatarConfig>(() => {
+    void settingsRevision;
+    const scenarioPrefix = liveAvatarScenarioKey.toUpperCase();
+    const readSetting = (suffix: string) =>
+      process.env[`REACT_APP_LIVEAVATAR_${scenarioPrefix}_${suffix}`] ||
+      process.env[`REACT_APP_LIVEAVATAR_${suffix}`] ||
+      window.localStorage.getItem(`LIVEAVATAR_${scenarioPrefix}_${suffix}`) ||
+      window.localStorage.getItem(`REACT_APP_LIVEAVATAR_${scenarioPrefix}_${suffix}`) ||
+      window.localStorage.getItem(`LIVEAVATAR_${suffix}`) ||
+      window.localStorage.getItem(`REACT_APP_LIVEAVATAR_${suffix}`) ||
+      '';
+    const readBoolean = (suffix: string) => readSetting(suffix).toLowerCase() === 'true';
+    const quality = readSetting('VIDEO_QUALITY');
+    const encoding = readSetting('VIDEO_ENCODING');
+
+    return {
+      scenarioKey: liveAvatarScenarioKey,
+      avatarId: readSetting('AVATAR_ID'),
+      contextId: readSetting('CONTEXT_ID'),
+      voiceId: readSetting('VOICE_ID'),
+      llmConfigurationId: readSetting('LLM_CONFIGURATION_ID'),
+      language: readSetting('LANGUAGE') || 'en',
+      quality: (['low', 'medium', 'high', 'very_high'].includes(quality) ? quality : 'high') as LiveAvatarConfig['quality'],
+      encoding: encoding === 'H264' ? 'H264' : 'VP8',
+      isSandbox: readBoolean('SANDBOX'),
+    };
+  }, [liveAvatarScenarioKey, settingsRevision]);
+
+  const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+  const liveAvatarApiKey = getLiveAvatarKey();
+  const shouldUseLiveAvatarRoom =
+    currentPage === 'training' &&
+    (Boolean(liveAvatarApiKey) || process.env.REACT_APP_LIVEAVATAR_ENABLED === 'true' || !isLocalHost);
+
   if (currentPage === 'landing') {
     return (
       <LandingPage
         onStartDemo={handleStartDemo}
         generatedScenario={generatedScenario}
         onScenarioCreated={setGeneratedScenario}
+        onLocalSettingsSaved={() => setSettingsRevision(revision => revision + 1)}
       />
     );
   }
@@ -394,16 +432,17 @@ const App: React.FC = () => {
     );
   }
 
-  const heygenApiKey = getHeyGenKey();
-  if (currentPage === 'training' && heygenApiKey) {
+  if (currentPage === 'training' && shouldUseLiveAvatarRoom) {
     return (
       <AvatarRoom
         scenario={currentScenario}
+        scenarioKey={liveAvatarScenarioKey}
         scriptTitle={trainingScript.title}
         scriptSections={trainingScript.sections}
         liveNudges={liveNudges}
         generatedScenario={selectedScenario === 'custom' ? generatedScenario : null}
-        heygenApiKey={heygenApiKey}
+        liveAvatarApiKey={liveAvatarApiKey}
+        liveAvatarConfig={liveAvatarConfig}
         onEnd={handleAvatarRoomEnd}
         onBack={handleBackToLanding}
       />

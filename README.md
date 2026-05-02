@@ -1,6 +1,35 @@
 # MSL-HCP Training Platform
 
-A modern, interactive training platform for Medical Science Liaisons (MSL) to practice conversations with Healthcare Professionals (HCP) using HeyGen's Interactive AI Avatars.
+A modern, interactive training platform for Medical Science Liaisons (MSL) to practice conversations with Healthcare Professionals (HCP) using LiveAvatar, Venice, and HeyGen Video Agent workflows.
+
+## Deployment Configuration
+
+Netlify production should keep live session secrets server-side:
+
+```env
+LIVEAVATAR_API_KEY=your_liveavatar_api_key
+LIVEAVATAR_AVATAR_ID=default_liveavatar_avatar_id
+LIVEAVATAR_CONTEXT_ID=optional_context_id
+LIVEAVATAR_VOICE_ID=optional_voice_id
+LIVEAVATAR_LANGUAGE=en
+```
+
+Scenario-specific overrides are supported when different HCP avatars are available:
+
+```env
+LIVEAVATAR_ALEX_AVATAR_ID=...
+LIVEAVATAR_ENA_AVATAR_ID=...
+LIVEAVATAR_DAT_AVATAR_ID=...
+LIVEAVATAR_CUSTOM_AVATAR_ID=...
+```
+
+AI coaching and scenario generation use Venice:
+
+```env
+REACT_APP_VENICE_API_KEY=your_venice_key
+```
+
+For local development only, the dashboard can save `LIVEAVATAR_API_KEY`, `LIVEAVATAR_AVATAR_ID`, `VENICE_API_KEY`, and `HEYGEN_API_KEY` in browser storage from the Scenario Builder settings panel. `REACT_APP_HEYGEN_API_KEY` is only used for HeyGen Video Agent storyboard sessions, not the live HCP avatar room.
 
 ## 🚀 Enhanced Features
 
