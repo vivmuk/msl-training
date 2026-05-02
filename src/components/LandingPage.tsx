@@ -3,17 +3,31 @@ import { motion } from 'framer-motion';
 import {
   AcademicCapIcon,
   ArrowRightIcon,
+  ArrowPathIcon,
   ChartBarIcon,
   ClockIcon,
   Cog6ToothIcon,
+  ClipboardDocumentIcon,
+  DocumentArrowUpIcon,
   DocumentChartBarIcon,
+  ServerStackIcon,
   ShieldCheckIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import {
   ATTR_CM_FALLBACK_SCENARIO,
   generateAttrCmScenario,
+  normalizeScenarioDraft,
   TrainingScenarioDraft,
 } from '../services/scenarioGenerator';
+import {
+  createLiveAvatarContextFromDraft,
+  listLiveAvatarAssets,
+  LiveAvatarAsset,
+  optimizePersonaPrompt,
+  PersonaBuilderInput,
+  PersonaDraft,
+} from '../services/personaStudio';
 import {
   createHeyGenTrainingVideoSession,
   getHeyGenTrainingVideoSession,
@@ -25,7 +39,6 @@ interface LandingPageProps {
   onStartDemo: (scenario: string) => void;
   onScenarioCreated?: (scenario: TrainingScenarioDraft) => void;
   generatedScenario?: TrainingScenarioDraft | null;
-  onLocalSettingsSaved?: () => void;
 }
 
 const scenarios = [
@@ -114,7 +127,24 @@ const benefits = [
   },
 ];
 
-const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreated, generatedScenario, onLocalSettingsSaved }) => {
+const DEFAULT_PERSONA_INPUT: PersonaBuilderInput = {
+  name: 'ATTR-CM Skeptical Cardiologist',
+  specialty: 'Cardiologist',
+  trainingGoal: 'Practice evidence exchange after identifying diagnostic workflow friction',
+  learnerAudience: 'Field MSLs preparing for cardiology visits',
+  difficulty: 'Intermediate',
+  personaNotes:
+    'Busy cardiologist who sees many HFpEF patients, has inconsistent access to PYP scans, and challenges vague claims.',
+  knowledgeLinks:
+    'https://www.ahajournals.org/doi/10.1161/CIRCHEARTFAILURE.119.006075 | ATTR-CM diagnostic pathway and red flags\nhttps://pubmed.ncbi.nlm.nih.gov/30145929/ | ATTR-ACT primary publication context',
+  sourceNotes:
+    'Use approved ATTR-CM disease education only. Include red flags such as HFpEF, increased LV wall thickness, carpal tunnel history, neuropathy, and need for appropriate diagnostic sequencing.',
+  complianceNotes:
+    'Do not discuss pricing, reimbursement, prescribing advice, or off-label/promotional claims. The HCP should ask for evidence and force the learner to stay balanced.',
+  openingStyle: 'Direct but collegial. Start with limited time and ask why the discussion is relevant.',
+};
+
+const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreated, generatedScenario }) => {
   const [builderInput, setBuilderInput] = useState({
     audience: 'New MSLs preparing for cardiology field visits',
     difficulty: 'Intermediate',
@@ -127,13 +157,16 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
   const [videoSession, setVideoSession] = useState<HeyGenAgentSession | null>(null);
   const [videoFeedback, setVideoFeedback] = useState('');
   const [videoStatus, setVideoStatus] = useState('');
-  const [apiKeys, setApiKeys] = useState({ venice: '', liveavatar: '', liveavatarAvatarId: '', heygen: '' });
-  const [savedKeys, setSavedKeys] = useState(() => ({
-    venice: Boolean(window.localStorage.getItem('VENICE_API_KEY')),
-    liveavatar: Boolean(window.localStorage.getItem('LIVEAVATAR_API_KEY')),
-    liveavatarAvatarId: Boolean(window.localStorage.getItem('LIVEAVATAR_AVATAR_ID')),
-    heygen: Boolean(window.localStorage.getItem('HEYGEN_API_KEY')),
-  }));
+  const [personaInput, setPersonaInput] = useState<PersonaBuilderInput>(DEFAULT_PERSONA_INPUT);
+  const [personaDraft, setPersonaDraft] = useState<PersonaDraft | null>(null);
+  const [personaStatus, setPersonaStatus] = useState('');
+  const [isOptimizingPersona, setIsOptimizingPersona] = useState(false);
+  const [isCreatingContext, setIsCreatingContext] = useState(false);
+  const [liveAvatarAssets, setLiveAvatarAssets] = useState<{
+    avatars: LiveAvatarAsset[];
+    contexts: LiveAvatarAsset[];
+    voices: LiveAvatarAsset[];
+  }>({ avatars: [], contexts: [], voices: [] });
 
   const customScenario = generatedScenario
     ? {
@@ -162,12 +195,15 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
     setBuilderInput(prev => ({ ...prev, [field]: value }));
   };
 
+  const updatePersona = (field: keyof PersonaBuilderInput, value: string) => {
+    setPersonaInput(prev => ({ ...prev, [field]: value }));
+  };
+
   const handleGenerateScenario = async () => {
     setIsGenerating(true);
     setBuilderError('');
 
     const apiKey =
-      apiKeys.venice ||
       process.env.REACT_APP_VENICE_API_KEY ||
       window.localStorage.getItem('VENICE_API_KEY') ||
       window.localStorage.getItem('REACT_APP_VENICE_API_KEY') ||
@@ -194,26 +230,135 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
   };
 
   const getHeyGenKey = () =>
-    apiKeys.heygen ||
     process.env.REACT_APP_HEYGEN_API_KEY ||
     window.localStorage.getItem('HEYGEN_API_KEY') ||
     window.localStorage.getItem('REACT_APP_HEYGEN_API_KEY') ||
     '';
 
-  const saveLocalKeys = () => {
-    if (apiKeys.venice) window.localStorage.setItem('VENICE_API_KEY', apiKeys.venice);
-    if (apiKeys.liveavatar) window.localStorage.setItem('LIVEAVATAR_API_KEY', apiKeys.liveavatar);
-    if (apiKeys.liveavatarAvatarId) window.localStorage.setItem('LIVEAVATAR_AVATAR_ID', apiKeys.liveavatarAvatarId);
-    if (apiKeys.heygen) window.localStorage.setItem('HEYGEN_API_KEY', apiKeys.heygen);
-    setSavedKeys({
-      venice: Boolean(apiKeys.venice || window.localStorage.getItem('VENICE_API_KEY')),
-      liveavatar: Boolean(apiKeys.liveavatar || window.localStorage.getItem('LIVEAVATAR_API_KEY')),
-      liveavatarAvatarId: Boolean(apiKeys.liveavatarAvatarId || window.localStorage.getItem('LIVEAVATAR_AVATAR_ID')),
-      heygen: Boolean(apiKeys.heygen || window.localStorage.getItem('HEYGEN_API_KEY')),
-    });
-    setApiKeys({ venice: '', liveavatar: '', liveavatarAvatarId: '', heygen: '' });
-    setBuilderError('Local API settings saved in this browser only.');
-    onLocalSettingsSaved?.();
+  const handleSourceFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    const notes: string[] = [];
+    for (const file of Array.from(files).slice(0, 6)) {
+      if (file.type.startsWith('text/') || /\.(txt|md|csv|json)$/i.test(file.name)) {
+        const text = await file.text();
+        notes.push(`Source file: ${file.name}\n${text.slice(0, 8000)}`);
+      } else {
+        notes.push(
+          `Source file attached for reference: ${file.name}. Paste key excerpts, slide notes, abstract text, or approved claims from this file into this field before optimizing.`,
+        );
+      }
+    }
+    setPersonaInput(prev => ({
+      ...prev,
+      sourceNotes: `${prev.sourceNotes}\n\n${notes.join('\n\n')}`.trim(),
+    }));
+  };
+
+  const handleOptimizePersona = async () => {
+    setIsOptimizingPersona(true);
+    setPersonaStatus('Optimizing persona prompt...');
+    const apiKey =
+      process.env.REACT_APP_VENICE_API_KEY ||
+      window.localStorage.getItem('VENICE_API_KEY') ||
+      window.localStorage.getItem('REACT_APP_VENICE_API_KEY') ||
+      '';
+    try {
+      const draft = await optimizePersonaPrompt(personaInput, apiKey);
+      setPersonaDraft(draft);
+      setPersonaStatus('Persona prompt ready. Review it before creating a LiveAvatar Context.');
+    } catch (error) {
+      console.error('Persona optimization failed:', error);
+      setPersonaStatus('Persona optimizer failed. A local fallback prompt is still available.');
+    } finally {
+      setIsOptimizingPersona(false);
+    }
+  };
+
+  const handleCreateLiveAvatarContext = async () => {
+    if (!personaDraft) return;
+    setIsCreatingContext(true);
+    setPersonaStatus('Creating LiveAvatar Context...');
+    try {
+      const context = await createLiveAvatarContextFromDraft(personaDraft);
+      window.localStorage.setItem('LIVEAVATAR_CUSTOM_CONTEXT_ID', context.id);
+      setPersonaStatus(`LiveAvatar Context created: ${context.name} (${context.id}). It will be used for generated custom scenarios.`);
+      setPersonaDraft(prev => (prev ? { ...prev, name: context.name } : prev));
+    } catch (error) {
+      console.error('LiveAvatar context creation failed:', error);
+      setPersonaStatus('Could not create the LiveAvatar Context. Confirm LIVEAVATAR_API_KEY is set in Netlify and the prompt fields are complete.');
+    } finally {
+      setIsCreatingContext(false);
+    }
+  };
+
+  const handleUsePersonaScenario = () => {
+    if (!personaDraft) return;
+    const contextId = window.localStorage.getItem('LIVEAVATAR_CUSTOM_CONTEXT_ID') || undefined;
+    onScenarioCreated?.(
+      normalizeScenarioDraft({
+        id: `persona-${Date.now()}`,
+        liveAvatarContextId: contextId,
+        title: personaDraft.scenarioTitle,
+        doctorName: personaDraft.doctorName,
+        specialty: personaDraft.specialty,
+        description: personaDraft.scenario.description,
+        difficulty: personaInput.difficulty as TrainingScenarioDraft['difficulty'],
+        trainingGoal: personaDraft.trainingGoal,
+        expectedChallenge: personaDraft.scenario.expectedChallenge,
+        currentObjective: personaDraft.scenario.currentObjective,
+        focusArea: personaDraft.trainingGoal,
+        stakeholder: personaDraft.specialty,
+        patientContext: personaDraft.scenario.patientContext,
+        keyDataPoint: personaDraft.scenario.keyDataPoint,
+        talkingPoint: personaDraft.scenario.talkingPoint,
+        likelyObjection: personaDraft.scenario.likelyObjection,
+        complianceReminder: personaDraft.scenario.complianceReminder,
+        scriptTitle: `Coach Mode - ${personaDraft.scenarioTitle}`,
+        scriptSections: [
+          {
+            title: 'Opening objective',
+            color: 'bg-blue-50 border-l-4 border-blue-400',
+            textColor: 'text-blue-900',
+            content: personaDraft.scenario.currentObjective,
+          },
+          {
+            title: 'Key data points',
+            color: 'bg-emerald-50 border-l-4 border-emerald-400',
+            textColor: 'text-emerald-900',
+            content: personaDraft.scenario.keyDataPoint,
+          },
+          {
+            title: 'Likely HCP objection',
+            color: 'bg-amber-50 border-l-4 border-amber-400',
+            textColor: 'text-amber-900',
+            content: personaDraft.scenario.likelyObjection,
+          },
+          {
+            title: 'Recommended response',
+            color: 'bg-slate-50 border-l-4 border-slate-400',
+            textColor: 'text-slate-900',
+            content: personaDraft.scenario.talkingPoint,
+          },
+        ],
+      }),
+    );
+    setPersonaStatus('Persona scenario added to the queue.');
+  };
+
+  const handleLoadLiveAvatarAssets = async () => {
+    setPersonaStatus('Loading LiveAvatar IDs from backend...');
+    try {
+      const [avatars, contexts, voices] = await Promise.all([
+        listLiveAvatarAssets('avatars'),
+        listLiveAvatarAssets('contexts'),
+        listLiveAvatarAssets('voices'),
+      ]);
+      setLiveAvatarAssets({ avatars, contexts, voices });
+      setPersonaStatus('LiveAvatar IDs loaded from backend.');
+    } catch (error) {
+      console.error('LiveAvatar ID lookup failed:', error);
+      setPersonaStatus('Could not load IDs. Set LIVEAVATAR_API_KEY in Netlify, or copy IDs from app.liveavatar.com.');
+    }
   };
 
   const handleCreateVideoStoryboard = async () => {
@@ -453,63 +598,6 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
               </label>
             </div>
 
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <label className="text-sm font-medium text-slate-700">
-                  Venice API key
-                  <input
-                    type="password"
-                    value={apiKeys.venice}
-                    onChange={event => setApiKeys(prev => ({ ...prev, venice: event.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                    placeholder="Used for scenario generation, live nudges, and analysis"
-                  />
-                  {savedKeys.venice && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
-                </label>
-                <label className="text-sm font-medium text-slate-700">
-                  LiveAvatar API key
-                  <input
-                    type="password"
-                    value={apiKeys.liveavatar}
-                    onChange={event => setApiKeys(prev => ({ ...prev, liveavatar: event.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                    placeholder="Used for real-time HCP avatar sessions"
-                  />
-                  {savedKeys.liveavatar && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
-                </label>
-                <label className="text-sm font-medium text-slate-700">
-                  LiveAvatar avatar ID
-                  <input
-                    value={apiKeys.liveavatarAvatarId}
-                    onChange={event => setApiKeys(prev => ({ ...prev, liveavatarAvatarId: event.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                    placeholder="Default avatar ID for local testing"
-                  />
-                  {savedKeys.liveavatarAvatarId && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
-                </label>
-                <label className="text-sm font-medium text-slate-700">
-                  HeyGen Video Agent key
-                  <input
-                    type="password"
-                    value={apiKeys.heygen}
-                    onChange={event => setApiKeys(prev => ({ ...prev, heygen: event.target.value }))}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-                    placeholder="Used for Video Agent storyboard sessions"
-                  />
-                  {savedKeys.heygen && <span className="mt-1 block text-xs font-medium text-emerald-700">Saved locally</span>}
-                </label>
-              </div>
-              <div className="mt-3 flex justify-end">
-                <button
-                  onClick={saveLocalKeys}
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                >
-                  Save Local Keys
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-slate-500">Keys are stored only in this browser and are not committed to the repo.</p>
-            </div>
-
             {builderError && <p className="mt-3 text-sm font-medium text-amber-700">{builderError}</p>}
             {generatedScenario && (
               <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
@@ -608,6 +696,206 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-700">Persona Studio</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-950">Build HCP personas and LiveAvatar Contexts</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-5 text-slate-600">
+                  Convert publications, source links, deck excerpts, and training goals into a context prompt for ATTR-CM simulations.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={handleLoadLiveAvatarAssets}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <ArrowPathIcon className="h-4 w-4" />
+                  Load IDs
+                </button>
+                <button
+                  onClick={handleOptimizePersona}
+                  disabled={isOptimizingPersona}
+                  className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:bg-slate-300"
+                >
+                  <SparklesIcon className="h-4 w-4" />
+                  {isOptimizingPersona ? 'Optimizing...' : 'Optimize Prompt'}
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <label className="text-sm font-medium text-slate-700">
+                Context name
+                <input
+                  value={personaInput.name}
+                  onChange={event => updatePersona('name', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Specialty
+                <input
+                  value={personaInput.specialty}
+                  onChange={event => updatePersona('specialty', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Learner audience
+                <input
+                  value={personaInput.learnerAudience}
+                  onChange={event => updatePersona('learnerAudience', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Difficulty
+                <select
+                  value={personaInput.difficulty}
+                  onChange={event => updatePersona('difficulty', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                >
+                  <option>Beginner</option>
+                  <option>Intermediate</option>
+                  <option>Advanced</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-700 md:col-span-2">
+                Training goal
+                <input
+                  value={personaInput.trainingGoal}
+                  onChange={event => updatePersona('trainingGoal', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700 md:col-span-2">
+                Persona behavior
+                <textarea
+                  value={personaInput.personaNotes}
+                  onChange={event => updatePersona('personaNotes', event.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700 md:col-span-2">
+                Publication and source links
+                <textarea
+                  value={personaInput.knowledgeLinks}
+                  onChange={event => updatePersona('knowledgeLinks', event.target.value)}
+                  rows={3}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700 md:col-span-2">
+                Source notes, abstracts, or slide excerpts
+                <textarea
+                  value={personaInput.sourceNotes}
+                  onChange={event => updatePersona('sourceNotes', event.target.value)}
+                  rows={5}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 md:col-span-2">
+                <span className="inline-flex items-center gap-2">
+                  <DocumentArrowUpIcon className="h-5 w-5 text-blue-700" />
+                  Add local source files
+                </span>
+                <input
+                  type="file"
+                  multiple
+                  accept=".txt,.md,.csv,.json,.pdf,.ppt,.pptx,.doc,.docx"
+                  onChange={event => handleSourceFiles(event.target.files)}
+                  className="max-w-xs text-xs text-slate-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Opening style
+                <input
+                  value={personaInput.openingStyle}
+                  onChange={event => updatePersona('openingStyle', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+              <label className="text-sm font-medium text-slate-700">
+                Compliance guardrails
+                <input
+                  value={personaInput.complianceNotes}
+                  onChange={event => updatePersona('complianceNotes', event.target.value)}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+                />
+              </label>
+            </div>
+
+            {personaStatus && <p className="mt-3 text-sm font-medium text-slate-700">{personaStatus}</p>}
+
+            {(liveAvatarAssets.avatars.length || liveAvatarAssets.contexts.length || liveAvatarAssets.voices.length) ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                {[
+                  ['Avatar IDs', liveAvatarAssets.avatars],
+                  ['Context IDs', liveAvatarAssets.contexts],
+                  ['Voice IDs', liveAvatarAssets.voices],
+                ].map(([title, rows]) => (
+                  <div key={title as string} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500">{title as string}</h3>
+                    <div className="mt-2 space-y-2">
+                      {(rows as LiveAvatarAsset[]).slice(0, 5).map(item => (
+                        <div key={item.id} className="rounded-md bg-white p-2 text-xs">
+                          <div className="font-semibold text-slate-800">{item.name}</div>
+                          <div className="mt-1 break-all font-mono text-slate-500">{item.id}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            {personaDraft && (
+              <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Optimized context draft</p>
+                    <h3 className="mt-1 font-bold text-slate-950">{personaDraft.name}</h3>
+                    <p className="mt-1 text-sm text-slate-700">{personaDraft.openingText}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={handleUsePersonaScenario}
+                      className="inline-flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+                    >
+                      <ClipboardDocumentIcon className="h-4 w-4" />
+                      Add Scenario
+                    </button>
+                    <button
+                      onClick={handleCreateLiveAvatarContext}
+                      disabled={isCreatingContext}
+                      className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:bg-slate-300"
+                    >
+                      {isCreatingContext ? 'Creating...' : 'Create Context'}
+                    </button>
+                  </div>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Knowledge summary</h4>
+                    <p className="mt-2 text-sm leading-5 text-slate-700">{personaDraft.knowledgeSummary}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wide text-slate-500">Scenario challenge</h4>
+                    <p className="mt-2 text-sm leading-5 text-slate-700">{personaDraft.scenario.expectedChallenge}</p>
+                  </div>
+                </div>
+                <textarea
+                  value={personaDraft.prompt}
+                  onChange={event => setPersonaDraft(prev => (prev ? { ...prev, prompt: event.target.value } : prev))}
+                  rows={8}
+                  className="mt-4 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 font-mono text-xs leading-5 text-slate-700 outline-none focus:border-blue-500"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-5">
               <p className="text-sm font-medium text-blue-700">Why AI training helps</p>
               <h2 className="mt-1 text-lg font-bold text-slate-950">Benefits for field medical teams</h2>
@@ -625,6 +913,21 @@ const LandingPage: React.FC<LandingPageProps> = ({ onStartDemo, onScenarioCreate
         </section>
 
         <aside className="space-y-6">
+          <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <ServerStackIcon className="h-6 w-6 text-blue-700" />
+              <div>
+                <h2 className="text-lg font-bold text-slate-950">Backend configuration</h2>
+                <p className="text-sm text-slate-600">Secrets live in Netlify, not in this page.</p>
+              </div>
+            </div>
+            <div className="mt-4 space-y-2 text-xs">
+              {['LIVEAVATAR_API_KEY', 'LIVEAVATAR_AVATAR_ID', 'LIVEAVATAR_CONTEXT_ID', 'VENICE_API_KEY'].map(item => (
+                <div key={item} className="rounded-md bg-slate-50 px-3 py-2 font-mono text-slate-700">{item}</div>
+              ))}
+            </div>
+          </div>
+
           <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-950">Recent performance</h2>

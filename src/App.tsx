@@ -154,7 +154,6 @@ const App: React.FC = () => {
   const [liveNudges, setLiveNudges] = useState<LiveFeedbackNudge[]>(DEFAULT_LIVE_NUDGES);
   const [reviewEntries, setReviewEntries] = useState<AnalysisEntry[]>([]);
   const [analysisError, setAnalysisError] = useState('');
-  const [settingsRevision, setSettingsRevision] = useState(0);
   const recorderRef = useRef<LiveTranscriptRecorder | null>(null);
 
   const currentScenario =
@@ -372,7 +371,6 @@ const App: React.FC = () => {
 
   const liveAvatarScenarioKey = selectedScenario === 'custom' ? 'custom' : selectedScenario;
   const liveAvatarConfig = useMemo<LiveAvatarConfig>(() => {
-    void settingsRevision;
     const scenarioPrefix = liveAvatarScenarioKey.toUpperCase();
     const readSetting = (suffix: string) =>
       process.env[`REACT_APP_LIVEAVATAR_${scenarioPrefix}_${suffix}`] ||
@@ -389,7 +387,10 @@ const App: React.FC = () => {
     return {
       scenarioKey: liveAvatarScenarioKey,
       avatarId: readSetting('AVATAR_ID'),
-      contextId: readSetting('CONTEXT_ID'),
+      contextId:
+        selectedScenario === 'custom' && generatedScenario?.liveAvatarContextId
+          ? generatedScenario.liveAvatarContextId
+          : readSetting('CONTEXT_ID'),
       voiceId: readSetting('VOICE_ID'),
       llmConfigurationId: readSetting('LLM_CONFIGURATION_ID'),
       language: readSetting('LANGUAGE') || 'en',
@@ -397,7 +398,7 @@ const App: React.FC = () => {
       encoding: encoding === 'H264' ? 'H264' : 'VP8',
       isSandbox: readBoolean('SANDBOX'),
     };
-  }, [liveAvatarScenarioKey, settingsRevision]);
+  }, [generatedScenario?.liveAvatarContextId, liveAvatarScenarioKey, selectedScenario]);
 
   const isLocalHost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
   const liveAvatarApiKey = getLiveAvatarKey();
@@ -411,7 +412,6 @@ const App: React.FC = () => {
         onStartDemo={handleStartDemo}
         generatedScenario={generatedScenario}
         onScenarioCreated={setGeneratedScenario}
-        onLocalSettingsSaved={() => setSettingsRevision(revision => revision + 1)}
       />
     );
   }

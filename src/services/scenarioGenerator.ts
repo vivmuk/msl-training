@@ -9,6 +9,7 @@ export interface ScenarioSection {
 
 export interface TrainingScenarioDraft {
   id: string;
+  liveAvatarContextId?: string;
   title: string;
   doctorName: string;
   specialty: string;
@@ -122,8 +123,26 @@ export function normalizeScenarioDraft(raw: Partial<TrainingScenarioDraft>): Tra
 
 export async function generateAttrCmScenario(
   input: ScenarioBuilderInput,
-  apiKey: string,
+  apiKey = '',
 ): Promise<TrainingScenarioDraft> {
+  try {
+    const res = await fetch('/.netlify/functions/persona-studio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'generateScenario', input }),
+    });
+    if (res.ok && res.headers.get('content-type')?.includes('application/json')) {
+      const data = await res.json();
+      if (data.scenario) return normalizeScenarioDraft(data.scenario);
+    }
+  } catch {
+    // Fall back to browser-side Venice only for local development.
+  }
+
+  if (!apiKey) {
+    throw new Error('VENICE_API_KEY is not configured for scenario generation.');
+  }
+
   const system = `You are an expert field medical training designer. Build realistic MSL skill-development simulations for ATTR-CM. Keep content medically balanced and non-promotional. Return only valid JSON.`;
   const user = `Create an ATTR-CM MSL training scenario for a medical training team.
 
